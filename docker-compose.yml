@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: helios-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: helios_parent_support
+      POSTGRES_USER: helios
+      POSTGRES_PASSWORD: helios_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - helios_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  helios_postgres_data:

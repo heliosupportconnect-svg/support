@@ -1,0 +1,274 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  PARENT
+  STAFF
+}
+
+enum AdminRole {
+  VP_PRIMARY
+  VP_SECONDARY
+  PRINCIPAL
+  DIRECTOR
+}
+
+enum StudentRelationshipType {
+  PARENT_GUARDIAN
+  OTHER
+}
+
+enum TicketStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  ESCALATED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  ACADEMIC
+  FINANCIAL
+  WELLNESS
+  TECHNICAL
+  TRANSPORT
+  SAFETY
+  OTHER
+}
+
+enum ActivityType {
+  STATUS_CHANGED
+  NOTE_ADDED
+  ASSIGNED
+  COMMENTED
+  FILE_UPLOADED
+}
+
+enum AttachmentType {
+  IMAGE
+  PDF
+  DOC
+  OTHER
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  role        Role     @default(PARENT)
+  phone       String?  @unique
+  emergencyPhone String?
+  passwordHash String
+  isActive    Boolean  @default(true)
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  studentLinks ParentStudent[]
+  sessions     Session[]
+  tickets      Ticket[]        @relation("TicketReporter")
+  assignedTickets Ticket[]     @relation("TicketAssignee")
+  notes        TicketNote[]
+  activities   TicketActivity[] @relation("ActivityActor")
+
+  @@index([email])
+}
+
+model AdminAccount {
+  adminId      String    @id
+  name         String
+  username     String    @unique
+  email        String?   @unique
+  mobile       String?   @unique
+  role         AdminRole
+  passwordHash String
+  isActive     Boolean   @default(true)
+  createdAt    DateTime
+  updatedAt    DateTime  @updatedAt
+
+  sessions AdminSession[]
+}
+
+model AdminSession {
+  id        String       @id @default(cuid())
+  adminId   String
+  tokenHash String       @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime      @default(now())
+
+  admin AdminAccount @relation(fields: [adminId], references: [adminId], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([expiresAt])
+}
+
+model Student {
+  id            String   @id @default(cuid())
+  admissionNumber String  @unique
+  firstName     String
+  lastName      String
+  className     String
+  section       String
+  rollNumber    String
+  house         String
+  modeOfTransport String?
+  busNumber     String?
+  busRoute      String?
+  gradeLevel    String?
+  schoolId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  parentLinks ParentStudent[]
+  tickets     Ticket[]
+
+  @@index([lastName, firstName])
+}
+
+model ParentStudent {
+  id                 String                  @id @default(cuid())
+  userId             String
+  studentId          String
+  relationshipType   StudentRelationshipType @default(PARENT_GUARDIAN)
+  isPrimaryContact   Boolean                 @default(true)
+  createdAt          DateTime                @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, studentId])
+  @@index([studentId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Ticket {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  status      TicketStatus  @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  category    TicketCategory @default(OTHER)
+  ticketNumber String       @unique
+  reporterId  String
+  assigneeId  String?
+  studentId   String?
+  schoolName  String?
+  parentSnapshot Json?
+  studentSnapshot Json?
+  assignedAdminId String?
+  assignedAdminRole String?
+  takenUpBy String?
+  takenUpAt DateTime?
+  takenUpByAdminIds Json?
+  takenUpAtByAdmin Json?
+  escalatedTo Json?
+  escalatedAt DateTime?
+  resolvedBy String?
+  resolvedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  reporter   User          @relation("TicketReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  assignee   User?         @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  student    Student?      @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  notes      TicketNote[]
+  activities TicketActivity[]
+  attachments Attachment[]
+
+  @@index([status, priority])
+  @@index([reporterId])
+  @@index([assigneeId])
+}
+
+model TicketNote {
+  id        String   @id @default(cuid())
+  ticketId  String
+  authorId  String?
+  authorAdminId String?
+  body      String
+  isInternal Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User?  @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+}
+
+model TicketActivity {
+  id        String      @id @default(cuid())
+  ticketId  String
+  actorId   String?
+  actorAdminId String?
+  actorAdminRole String?
+  type      ActivityType
+  message   String
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actor  User?  @relation("ActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+}
+
+model Attachment {
+  id         String        @id @default(cuid())
+  ticketId   String
+  fileName   String
+  url        String?
+  storageKey String
+  mimeType   String
+  sizeBytes  Int?
+  type       AttachmentType @default(OTHER)
+  uploadedAt DateTime      @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model CarouselSlide {
+  id        String   @id @default(cuid())
+  title     String
+  subtitle  String?
+  imageUrl  String?
+  storageKey String?
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, order])
+}

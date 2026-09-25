@@ -17,9 +17,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const file = form.get('image')
   const payload = JSON.parse(typeof form.get('payload') === 'string' ? String(form.get('payload')) : '{}') as Record<string, unknown>
   let uploadedStorageKey: string | null = null
+  let slide: CarouselSlide
+  let existing: CarouselSlide
   try {
-    const existing = await prisma.carouselSlide.findUnique({ where: { id } })
-    if (!existing) return NextResponse.json({ error: 'Slide not found.' }, { status: 404 })
+    const storedSlide = await prisma.carouselSlide.findUnique({ where: { id } })
+    if (!storedSlide) return NextResponse.json({ error: 'Slide not found.' }, { status: 404 })
+    existing = storedSlide
     let storageKey = existing.storageKey
     let imageUrl = existing.imageUrl
     if (file instanceof File) {
@@ -29,7 +32,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       await uploadObject(DASHBOARD_IMAGES_BUCKET, storageKey, Buffer.from(await file.arrayBuffer()), file.type)
       imageUrl = null
     }
-    const slide = await prisma.carouselSlide.update({
+    slide = await prisma.carouselSlide.update({
       where: { id },
       data: {
         title: typeof payload.title === 'string' ? payload.title.trim() : existing.title,
@@ -40,11 +43,37 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         imageUrl,
       },
     })
-    if (file instanceof File && existing.storageKey) await deleteObject(DASHBOARD_IMAGES_BUCKET, existing.storageKey).catch(() => undefined)
-    return NextResponse.json({ slide: await safeSlide(slide) })
   } catch {
     if (uploadedStorageKey) await deleteObject(DASHBOARD_IMAGES_BUCKET, uploadedStorageKey).catch(() => undefined)
     return NextResponse.json({ error: 'Unable to update dashboard update.' }, { status: 503 })
+  }
+
+  if (file instanceof File && existing.storageKey) {
+    try {
+      await deleteObject(DASHBOARD_IMAGES_BUCKET, existing.storageKey)
+    } catch {
+      try {
+        await prisma.carouselSlide.update({
+          where: { id },
+          data: {
+            title: existing.title,
+            subtitle: existing.subtitle,
+            isActive: existing.isActive,
+            order: existing.order,
+            storageKey: existing.storageKey,
+            imageUrl: existing.imageUrl,
+          },
+        })
+      } catch {}
+      if (uploadedStorageKey) await deleteObject(DASHBOARD_IMAGES_BUCKET, uploadedStorageKey).catch(() => undefined)
+      return NextResponse.json({ error: 'Dashboard update saved, but the old dashboard image could not be removed. Retry cleanup.' }, { status: 503 })
+    }
+  }
+
+  try {
+    return NextResponse.json({ slide: await safeSlide(slide) })
+  } catch {
+    return NextResponse.json({ error: 'Dashboard update saved, but its image URL could not be generated.' }, { status: 503 })
   }
 }
 
@@ -54,8 +83,21 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   try {
     const existing = await prisma.carouselSlide.findUnique({ where: { id } })
     if (!existing) return NextResponse.json({ error: 'Slide not found.' }, { status: 404 })
-    await prisma.carouselSlide.delete({ where: { id } })
-    if (existing.storageKey) await deleteObject(DASHBOARD_IMAGES_BUCKET, existing.storageKey).catch(() => undefined)
+
+    if (existing.storageKey) {
+      try {
+        await deleteObject(DASHBOARD_IMAGES_BUCKET, existing.storageKey)
+      } catch {
+        return NextResponse.json({ error: 'Unable to remove the dashboard image from object storage. The slide was not deleted.' }, { status: 503 })
+      }
+    }
+
+    try {
+      await prisma.carouselSlide.delete({ where: { id } })
+    } catch {
+      return NextResponse.json({ error: 'Dashboard image removed, but the slide record could not be deleted. Retry deletion.' }, { status: 503 })
+    }
+
     return NextResponse.json({ ok: true })
   } catch {
     return NextResponse.json({ error: 'Unable to delete dashboard update.' }, { status: 503 })

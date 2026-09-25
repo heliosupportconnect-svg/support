@@ -450,7 +450,24 @@ export default function AdminTicketDetailsPage() {
             <section className="rounded-[24px] border border-slate-100 bg-white p-5 shadow-sm">
               <h2 className="text-base font-bold">Supporting Attachments</h2>
               {ticket.attachmentNames.length ? (
-                <div className="mt-3 space-y-2">{ticket.attachmentNames.map((name) => <div key={name} className="rounded-xl bg-helios-surface-low p-3 text-xs font-semibold">{name}</div>)}</div>
+                <div className="mt-3 space-y-2">{(ticket.attachments ?? []).map((attachment) => {
+                  const attachmentEndpoint = `/api/admin/attachments/${encodeURIComponent(attachment.id)}`;
+                  return (
+                    <div key={attachment.id} className="flex flex-col gap-3 rounded-xl bg-helios-surface-low p-3 text-xs font-semibold sm:flex-row sm:items-center sm:justify-between">
+                      <span className="min-w-0 break-words">{attachment.fileName}</span>
+                      <div className="flex shrink-0 gap-2">
+                        <a href={attachmentEndpoint} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-helios-primary hover:bg-slate-50">
+                          <Icon className="text-base">visibility</Icon>
+                          View
+                        </a>
+                        <a href={`${attachmentEndpoint}?download=1`} download={attachment.fileName} className="inline-flex items-center gap-1.5 rounded-lg bg-helios-primary-container px-3 py-2 text-xs font-bold text-white hover:opacity-90">
+                          <Icon className="text-base">download</Icon>
+                          Download
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}</div>
               ) : (
                 <p className="mt-3 rounded-xl border border-dashed border-slate-200 p-3 text-xs text-helios-muted">No attachments uploaded.</p>
               )}

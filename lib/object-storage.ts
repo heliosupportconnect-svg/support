@@ -63,10 +63,21 @@ export async function createSignedObjectUrl(
   bucket: string,
   key: string,
   expiresIn = 300,
+  options: { downloadFileName?: string; contentType?: string } = {},
 ): Promise<string> {
+  const safeFileName = options.downloadFileName?.replace(/[\r\n"]/g, '_').replace(/\\/g, '\\\\')
   return getSignedUrl(
     getClient(),
-    new GetObjectCommand({ Bucket: bucket, Key: key }),
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ...(options.downloadFileName
+        ? {
+            ResponseContentDisposition: `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(options.downloadFileName)}`,
+          }
+        : {}),
+      ...(options.contentType ? { ResponseContentType: options.contentType } : {}),
+    }),
     { expiresIn },
   )
 }

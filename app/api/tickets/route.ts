@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { getCurrentAdmin } from '@/lib/admin-auth'
 import { getCurrentParent } from '@/lib/auth'
+import { getAdminTicketVisibilityWhere } from '@/lib/admin-ticket-access'
 import { prisma } from '@/lib/prisma'
 import { createStorageKey, deleteObject, TICKET_ATTACHMENTS_BUCKET, uploadObject } from '@/lib/object-storage'
 import type { LocalTicket, TicketProfileSnapshot } from '@/lib/local-tickets'
@@ -89,7 +90,7 @@ export function mapTicket(ticket: TicketWithRelations): LocalTicket {
 async function getVisibleTickets() {
   const admin = await getCurrentAdmin()
   if (admin) {
-    return prisma.ticket.findMany({ include: includeTicket, orderBy: { createdAt: 'desc' } })
+    return prisma.ticket.findMany({ where: getAdminTicketVisibilityWhere(admin.account), include: includeTicket, orderBy: { createdAt: 'desc' } })
   }
   const parent = await getCurrentParent()
   if (!parent) return null

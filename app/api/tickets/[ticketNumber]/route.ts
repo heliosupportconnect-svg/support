@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getCurrentAdmin } from '@/lib/admin-auth'
 import { getCurrentParent } from '@/lib/auth'
+import { canAccessAdminTicket } from '@/lib/admin-ticket-access'
 import { prisma } from '@/lib/prisma'
 import { mapTicket } from '@/app/api/tickets/route'
 
@@ -33,17 +34,6 @@ function activityType(title: unknown): 'STATUS_CHANGED' | 'NOTE_ADDED' | 'ASSIGN
   return 'STATUS_CHANGED'
 }
 
-function canAccessTicket(role: string, ticket: { studentSnapshot: unknown; student: { className: string } | null }): boolean {
-  const snapshot = typeof ticket.studentSnapshot === 'object' && ticket.studentSnapshot !== null ? ticket.studentSnapshot as Record<string, unknown> : null
-  const className = typeof snapshot?.className === 'string' ? snapshot.className : ticket.student?.className ?? ''
-  const match = className.match(/(\d+)/)
-  const classNumber = match ? Number(match[1]) : null
-  if (role === 'PRINCIPAL' || role === 'DIRECTOR') return classNumber !== null && classNumber >= 1 && classNumber <= 10
-  if (role === 'VP_PRIMARY') return classNumber !== null && classNumber >= 1 && classNumber <= 5
-  if (role === 'VP_SECONDARY') return classNumber !== null && classNumber >= 6 && classNumber <= 10
-  return false
-}
-
 export async function GET(_request: Request, context: { params: Promise<{ ticketNumber: string }> }) {
   const { ticketNumber } = await context.params
   const admin = await getCurrentAdmin()
@@ -54,7 +44,7 @@ export async function GET(_request: Request, context: { params: Promise<{ ticket
     const ticket = await prisma.ticket.findUnique({ where: { ticketNumber: decodeURIComponent(ticketNumber) }, include: includeTicket })
     if (!ticket) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
     if (parent && ticket.reporterId !== parent.id) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
-    if (admin && !canAccessTicket(admin.account.role, ticket)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    if (admin && !canAccessAdminTicket(admin.account, ticket)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     return NextResponse.json({ ticket: mapTicket(ticket) })
   } catch {
     return NextResponse.json({ error: 'Unable to load ticket from Neon.' }, { status: 503 })
@@ -72,7 +62,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ ticke
   try {
     const existing = await prisma.ticket.findUnique({ where: { ticketNumber: decodeURIComponent(ticketNumber) }, include: { student: true } })
     if (!existing) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
-    if (!canAccessTicket(admin.account.role, existing)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    if (!canAccessAdminTicket(admin.account, existing)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     if ((admin.account.role === 'VP_PRIMARY' || admin.account.role === 'VP_SECONDARY') && Array.isArray(existing.escalatedTo) && existing.escalatedTo.some((target) => target === 'PRINCIPAL' || target === 'DIRECTOR')) {
       return NextResponse.json({ error: 'This ticket is read-only after escalation.' }, { status: 403 })
     }

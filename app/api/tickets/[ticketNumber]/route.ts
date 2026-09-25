@@ -4,6 +4,7 @@ import { getCurrentParent } from '@/lib/auth'
 import { canAccessAdminTicket } from '@/lib/admin-ticket-access'
 import { prisma } from '@/lib/prisma'
 import { mapTicket } from '@/app/api/tickets/route'
+import { parseLegacyTicketNumber, parseTicketNumber } from '@/lib/ticket-number'
 
 const includeTicket = {
   student: true,
@@ -36,12 +37,18 @@ function activityType(title: unknown): 'STATUS_CHANGED' | 'NOTE_ADDED' | 'ASSIGN
 
 export async function GET(_request: Request, context: { params: Promise<{ ticketNumber: string }> }) {
   const { ticketNumber } = await context.params
+  const publicTicketNumber = parseTicketNumber(ticketNumber)
+  const legacyTicketNumber = publicTicketNumber === null ? parseLegacyTicketNumber(ticketNumber) : null
+  if (publicTicketNumber === null && legacyTicketNumber === null) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
   const admin = await getCurrentAdmin()
   const parent = admin ? null : await getCurrentParent()
   if (!admin && !parent) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
   try {
-    const ticket = await prisma.ticket.findUnique({ where: { ticketNumber: decodeURIComponent(ticketNumber) }, include: includeTicket })
+    const ticket = await prisma.ticket.findUnique({
+      where: publicTicketNumber !== null ? { ticketNumber: publicTicketNumber } : { legacyTicketNumber: legacyTicketNumber! },
+      include: includeTicket,
+    })
     if (!ticket) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
     if (parent && ticket.reporterId !== parent.id) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     if (admin && !canAccessAdminTicket(admin.account, ticket)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
@@ -55,12 +62,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ ticke
   const admin = await getCurrentAdmin()
   if (!admin) return NextResponse.json({ error: 'Admin authentication required.' }, { status: 401 })
   const { ticketNumber } = await context.params
+  const publicTicketNumber = parseTicketNumber(ticketNumber)
+  const legacyTicketNumber = publicTicketNumber === null ? parseLegacyTicketNumber(ticketNumber) : null
+  if (publicTicketNumber === null && legacyTicketNumber === null) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
 
   let body: Record<string, unknown>
   try { body = await request.json() as Record<string, unknown> } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }) }
 
   try {
-    const existing = await prisma.ticket.findUnique({ where: { ticketNumber: decodeURIComponent(ticketNumber) }, include: { student: true } })
+    const existing = await prisma.ticket.findUnique({
+      where: publicTicketNumber !== null ? { ticketNumber: publicTicketNumber } : { legacyTicketNumber: legacyTicketNumber! },
+      include: { student: true },
+    })
     if (!existing) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
     if (!canAccessAdminTicket(admin.account, existing)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     if ((admin.account.role === 'VP_PRIMARY' || admin.account.role === 'VP_SECONDARY') && Array.isArray(existing.escalatedTo) && existing.escalatedTo.some((target) => target === 'PRINCIPAL' || target === 'DIRECTOR')) {

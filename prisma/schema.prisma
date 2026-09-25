@@ -179,7 +179,8 @@ model Ticket {
   status      TicketStatus  @default(OPEN)
   priority    TicketPriority @default(MEDIUM)
   category    TicketCategory @default(OTHER)
-  ticketNumber String       @unique
+  ticketNumber Int          @unique @default(autoincrement())
+  legacyTicketNumber String? @unique
   reporterId  String
   assigneeId  String?
   studentId   String?

@@ -5,6 +5,7 @@ import { getCurrentParent } from '@/lib/auth'
 import { getAdminTicketVisibilityWhere } from '@/lib/admin-ticket-access'
 import { prisma } from '@/lib/prisma'
 import { createStorageKey, deleteObject, TICKET_ATTACHMENTS_BUCKET, uploadObject } from '@/lib/object-storage'
+import { formatTicketNumber } from '@/lib/ticket-number'
 import type { LocalTicket, TicketProfileSnapshot } from '@/lib/local-tickets'
 
 function localStatus(status: string): LocalTicket['status'] {
@@ -51,7 +52,7 @@ export function mapTicket(ticket: TicketWithRelations): LocalTicket {
   ].sort((first, second) => first.createdAt.localeCompare(second.createdAt))
   return {
     id: ticket.id,
-    ticketNumber: ticket.ticketNumber,
+    ticketNumber: formatTicketNumber(ticket.ticketNumber).slice(1),
     parentId: ticket.reporterId,
     studentId: ticket.studentId ?? ticket.student?.admissionNumber ?? '',
     category: ticket.category,
@@ -182,7 +183,6 @@ export async function POST(request: Request) {
           title: subject,
           description,
           category: databaseCategory(category) as never,
-          ticketNumber: `HEL-${Date.now().toString(36).toUpperCase()}`,
           reporterId: parent.id,
           studentId: studentLink.student.id,
           parentSnapshot,

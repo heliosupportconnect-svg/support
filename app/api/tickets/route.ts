@@ -134,6 +134,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Subject, description, class, and section are required.' }, { status: 400 })
   }
 
+  const requestedStudentId = typeof payload.studentId === 'string' ? payload.studentId.trim() : ''
+  const studentLink = await prisma.parentStudent.findFirst({
+    where: {
+      userId: parent.id,
+      ...(requestedStudentId
+        ? {
+            OR: [
+              { studentId: requestedStudentId },
+              { student: { admissionNumber: requestedStudentId } },
+            ],
+          }
+        : {}),
+    },
+    include: { student: true },
+  })
+  if (!studentLink) {
+    return NextResponse.json({ error: 'The selected student is not linked to this parent account.' }, { status: 403 })
+  }
+
   const parentSnapshot = {
     parentName: parent.name, email: parent.email, phone: parent.phone, emergencyPhone: parent.emergencyPhone,
     relationship: parent.relationship, studentName: parent.student.name, admissionNumber: parent.student.admissionNumber,
@@ -156,7 +175,6 @@ export async function POST(request: Request) {
       uploadedKeys.push(item.key)
     }
 
-    const student = await prisma.student.findUnique({ where: { admissionNumber: parent.student.admissionNumber } })
     const ticket = await prisma.$transaction(async (tx) => {
       const created = await tx.ticket.create({
         data: {
@@ -165,7 +183,7 @@ export async function POST(request: Request) {
           category: databaseCategory(category) as never,
           ticketNumber: `HEL-${Date.now().toString(36).toUpperCase()}`,
           reporterId: parent.id,
-          studentId: student?.id ?? null,
+          studentId: studentLink.student.id,
           parentSnapshot,
           studentSnapshot,
         },

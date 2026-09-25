@@ -130,7 +130,14 @@ export default function ParentDashboardPage() {
 
   useEffect(() => {
     let active = true;
-    void getParentSession().then((current) => {
+    void Promise.resolve().then(() => {
+      if (!active) return null;
+      setParent(null);
+      setTickets([]);
+      setCurrentClass("");
+      setCurrentSection("");
+      return getParentSession(true);
+    }).then((current) => {
       if (!active) return;
       if (!current) {
         router.replace("/login");

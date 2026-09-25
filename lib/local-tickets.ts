@@ -44,8 +44,14 @@ export async function loadTickets(): Promise<LocalTicket[]> {
   return result.tickets as LocalTicket[];
 }
 
-export async function getLocalTicketsForParent(_parentId: string): Promise<LocalTicket[]> { return loadTickets(); }
-export async function getLocalTicketForParent(ticketNumber: string, _parentId: string): Promise<LocalTicket | null> { return getLocalTicket(ticketNumber); }
+export async function getLocalTicketsForParent(parentId: string): Promise<LocalTicket[]> {
+  const tickets = await loadTickets();
+  return tickets.filter((ticket) => ticket.parentId === parentId);
+}
+export async function getLocalTicketForParent(ticketNumber: string, parentId: string): Promise<LocalTicket | null> {
+  const ticket = await getLocalTicket(ticketNumber);
+  return ticket?.parentId === parentId ? ticket : null;
+}
 export async function getLocalTicket(ticketNumber: string): Promise<LocalTicket | null> {
   if (!isBrowser()) return null;
   const response = await fetch(`/api/tickets/${encodeURIComponent(ticketNumber)}`, { cache: "no-store" });

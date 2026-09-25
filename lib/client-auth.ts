@@ -120,7 +120,11 @@ export async function getParentSession(forceRefresh = false): Promise<{ session:
   }
   const result = await readResponse(response);
   const parent = readParent(result.parent);
-  if (!parent) return null;
+  if (!parent) {
+    currentParent = null;
+    currentSession = null;
+    return null;
+  }
   setCurrentParent(parent);
   return { session: currentSession!, parent };
 }

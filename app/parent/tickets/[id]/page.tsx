@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getLocalParent, getLocalSession, getParentSession, type LocalParentAccount } from "@/lib/client-auth";
+import { getParentSession, type LocalParentAccount } from "@/lib/client-auth";
 import { getLocalTicketForParent, getTicketStatusLabel, updateLocalTicket, type LocalTicket } from "@/lib/local-tickets";
 
 const stages = ["Submitted", "In Progress", "Resolved"];
@@ -23,7 +23,12 @@ export default function ParentTicketDetailsPage() {
   useEffect(() => {
     let active = true;
     const ticketNumber = decodeURIComponent(params.id ?? "").replace(/^#/, "");
-    void getParentSession().then(async (current) => {
+    void Promise.resolve().then(() => {
+      if (!active) return null;
+      setParent(null);
+      setTicket(null);
+      return getParentSession(true);
+    }).then(async (current) => {
       if (!active) return;
       if (!current) { router.replace("/login"); return; }
       setParent(current.parent);

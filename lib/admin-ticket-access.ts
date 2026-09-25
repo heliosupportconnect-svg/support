@@ -37,6 +37,7 @@ export function getAdminTicketVisibilityWhere(admin: AdminIdentity): PrismaTypes
   if (admin.role === 'PRINCIPAL' || admin.role === 'DIRECTOR') {
     return {
       OR: [
+        getClassVisibilityWhere(1, 10),
         { escalatedTo: { array_contains: [admin.role] } },
         { takenUpByAdminIds: { array_contains: [admin.adminId] } },
         { resolvedBy: admin.adminId },
@@ -51,6 +52,8 @@ export function canAccessAdminTicket(admin: AdminIdentity, ticket: AdminTicket):
   if (admin.role === 'VP_PRIMARY') return classNumber !== null && classNumber >= 1 && classNumber <= 5
   if (admin.role === 'VP_SECONDARY') return classNumber !== null && classNumber >= 6 && classNumber <= 10
   if (admin.role !== 'PRINCIPAL' && admin.role !== 'DIRECTOR') return false
+
+  if (classNumber !== null && classNumber >= 1 && classNumber <= 10) return true
 
   const escalatedTo = Array.isArray(ticket.escalatedTo) ? ticket.escalatedTo : []
   const takenUpByAdminIds = Array.isArray(ticket.takenUpByAdminIds) ? ticket.takenUpByAdminIds : []

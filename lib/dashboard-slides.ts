@@ -32,8 +32,18 @@ export async function createDashboardSlide(file: File, title: string, position: 
   form.set("position", String(position));
   form.append("image", file, file.name);
   const response = await fetch("/api/admin/slides", { method: "POST", body: form });
-  const result = await response.json() as { slide?: DashboardSlide; error?: string };
-  if (!response.ok || !result.slide) throw new Error(result.error ?? "Unable to save dashboard update to Neon.");
+  const result = await response.json() as { slide?: DashboardSlide; error?: string; requestId?: string };
+  if (!response.ok || !result.slide) {
+    const messages: Record<string, string> = {
+      authorization_failed: "You are not authorized to publish dashboard updates.",
+      validation_failed: "Please select a JPEG or PNG image under 5 MB and enter a title.",
+      storage_upload_failed: "Unable to upload the dashboard image to object storage.",
+      database_write_failed: "The image uploaded, but the dashboard update could not be saved.",
+      signed_url_failed: "The dashboard update was saved, but its image URL could not be generated.",
+    };
+    const message = messages[result.error ?? ""] ?? "Unable to save dashboard update to Neon/object storage.";
+    throw new Error(result.requestId ? `${message} (Request ID: ${result.requestId})` : message);
+  }
   return result.slide;
 }
 

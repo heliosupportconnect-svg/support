@@ -7,6 +7,16 @@ export const TICKET_ATTACHMENTS_BUCKET = 'ticket-attachments'
 
 let client: S3Client | null = null
 
+export function getObjectStorageEnvironmentStatus() {
+  return {
+    OBJECT_STORAGE_ENDPOINT: Boolean(process.env.OBJECT_STORAGE_ENDPOINT),
+    OBJECT_STORAGE_REGION: Boolean(process.env.OBJECT_STORAGE_REGION),
+    OBJECT_STORAGE_ACCESS_KEY_ID: Boolean(process.env.OBJECT_STORAGE_ACCESS_KEY_ID),
+    OBJECT_STORAGE_SECRET_ACCESS_KEY: Boolean(process.env.OBJECT_STORAGE_SECRET_ACCESS_KEY),
+    OBJECT_STORAGE_FORCE_PATH_STYLE: Boolean(process.env.OBJECT_STORAGE_FORCE_PATH_STYLE),
+  }
+}
+
 function getClient(): S3Client {
   const endpoint = process.env.OBJECT_STORAGE_ENDPOINT ?? process.env.AWS_ENDPOINT_URL_S3
   const region = process.env.OBJECT_STORAGE_REGION ?? process.env.AWS_REGION

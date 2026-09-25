@@ -6,6 +6,10 @@ export function formatTicketNumber(value: number): string {
   return `#HL-${String(value).padStart(6, '0')}`
 }
 
+export function formatTicketIdentifier(value: number): string {
+  return formatTicketNumber(value).slice(1)
+}
+
 export function parseTicketNumber(value: string): number | null {
   let normalized: string
   try {

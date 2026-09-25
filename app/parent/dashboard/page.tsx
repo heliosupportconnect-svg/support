@@ -12,11 +12,6 @@ import {
   getLocalSession,
   getParentSession,
   logoutLocalParent,
-  normalizeStudentClassSelection,
-  normalizeStudentSectionSelection,
-  STUDENT_CLASS_OPTIONS,
-  STUDENT_SECTION_OPTIONS,
-  updateLocalParentStudentPlacement,
 } from "@/lib/client-auth";
 import {
   createLocalTicket,
@@ -125,8 +120,6 @@ export default function ParentDashboardPage() {
   const router = useRouter();
   const [parent, setParent] = useState<ReturnType<typeof getLocalParent>>(null);
   const [tickets, setTickets] = useState<LocalTicket[]>([]);
-  const [currentClass, setCurrentClass] = useState("");
-  const [currentSection, setCurrentSection] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -134,8 +127,6 @@ export default function ParentDashboardPage() {
       if (!active) return null;
       setParent(null);
       setTickets([]);
-      setCurrentClass("");
-      setCurrentSection("");
       return getParentSession(true);
     }).then((current) => {
       if (!active) return;
@@ -144,9 +135,7 @@ export default function ParentDashboardPage() {
         return;
       }
       setParent(current.parent);
-      setCurrentClass(normalizeStudentClassSelection(current.parent.student.className || ""));
-      setCurrentSection(normalizeStudentSectionSelection(current.parent.student.section || ""));
-      void getLocalTicketsForParent(current.parent.id).then(setTickets).catch(() => setTickets([]));
+      void getLocalTicketsForParent().then(setTickets).catch(() => setTickets([]));
     });
 
     return () => { active = false; };
@@ -239,18 +228,6 @@ export default function ParentDashboardPage() {
       return;
     }
 
-    const trimmedClass = currentClass.trim();
-    const trimmedSection = currentSection.trim();
-    const normalizedClass = normalizeStudentClassSelection(trimmedClass);
-    const normalizedSection = normalizeStudentSectionSelection(trimmedSection);
-
-    if (!normalizedClass || !normalizedSection) {
-      setNotificationMessage(
-        "Please select the student's current class and section before submitting the ticket."
-      );
-      return;
-    }
-
     const session = getLocalSession();
     const currentParent = getLocalParent();
 
@@ -260,57 +237,12 @@ export default function ParentDashboardPage() {
     }
 
     try {
-      const updatedParent = await updateLocalParentStudentPlacement(normalizedClass, normalizedSection);
-      if (!updatedParent) {
-        setNotificationMessage("Unable to update the student profile. Please try again.");
-        return;
-      }
-
-      setParent(updatedParent);
-      setCurrentClass(updatedParent.student.className);
-      setCurrentSection(updatedParent.student.section);
-
       const ticket = await createLocalTicket({
-        parentId: currentParent.id,
         studentId: currentParent.student.admissionNumber,
         category,
         subject: subject.trim(),
         description: description.trim(),
         attachmentNames: attachment ? [attachment.name] : [],
-        parentSnapshot: {
-          parentName: currentParent.name,
-          email: currentParent.email,
-          phone: currentParent.phone,
-          emergencyPhone: currentParent.emergencyPhone,
-          relationship: currentParent.relationship ?? currentParent.student.relationship,
-          studentName: currentParent.student.name,
-          admissionNumber: currentParent.student.admissionNumber,
-          className: normalizedClass,
-          section: normalizedSection,
-          rollNumber: currentParent.student.rollNumber,
-          house: currentParent.student.house,
-          modeOfTransport: currentParent.student.modeOfTransport,
-          busNumber: currentParent.student.busNumber,
-          busRoute: currentParent.student.busRoute,
-        },
-        studentSnapshot: {
-          parentName: currentParent.name,
-          email: currentParent.email,
-          phone: currentParent.phone,
-          emergencyPhone: currentParent.emergencyPhone,
-          relationship: currentParent.relationship ?? currentParent.student.relationship,
-          studentName: currentParent.student.name,
-          admissionNumber: currentParent.student.admissionNumber,
-          className: normalizedClass,
-          section: normalizedSection,
-          rollNumber: currentParent.student.rollNumber,
-          house: currentParent.student.house,
-          modeOfTransport: currentParent.student.modeOfTransport,
-          busNumber: currentParent.student.busNumber,
-          busRoute: currentParent.student.busRoute,
-        },
-        className: normalizedClass,
-        section: normalizedSection,
         attachment: attachment ?? undefined,
       });
 
@@ -631,19 +563,7 @@ export default function ParentDashboardPage() {
                     <span className="ml-1 text-helios-orange">*</span>
                   </label>
 
-                  <select
-                    id="student-current-class"
-                    value={currentClass}
-                    onChange={(event) => setCurrentClass(event.target.value)}
-                    className="helios-input"
-                  >
-                    <option value="">Select class</option>
-                    {STUDENT_CLASS_OPTIONS.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="helios-input" aria-readonly="true">{parent?.student.className || "Not available"}</div>
                 </div>
 
                 <div>
@@ -652,19 +572,7 @@ export default function ParentDashboardPage() {
                     <span className="ml-1 text-helios-orange">*</span>
                   </label>
 
-                  <select
-                    id="student-current-section"
-                    value={currentSection}
-                    onChange={(event) => setCurrentSection(event.target.value)}
-                    className="helios-input"
-                  >
-                    <option value="">Select section</option>
-                    {STUDENT_SECTION_OPTIONS.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="helios-input" aria-readonly="true">{parent?.student.section || "Not available"}</div>
                 </div>
               </div>
 
@@ -1135,7 +1043,7 @@ function TicketSection({
           )}
         </div>
       ) : tickets.map((ticket) => (
-        <article key={ticket.id} role="button" tabIndex={0} onClick={() => onOpen(ticket.ticketNumber)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(ticket.ticketNumber); } }} className="cursor-pointer rounded-2xl bg-white p-4 shadow-sm transition hover:bg-helios-surface-low md:p-5">
+        <article key={ticket.ticketNumber} role="button" tabIndex={0} onClick={() => onOpen(ticket.ticketNumber)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(ticket.ticketNumber); } }} className="cursor-pointer rounded-2xl bg-white p-4 shadow-sm transition hover:bg-helios-surface-low md:p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">

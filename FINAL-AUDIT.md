@@ -15,7 +15,7 @@ The current Step 97 attachment implementation is uncommitted and was reviewed se
 - Parent login, logout, session lookup, and invalid-session clearing use the `helios_session` server cookie and Neon `Session` records.
 - Admin login, logout, session lookup, and revocation use the `helios_admin_session` server cookie and Neon `AdminSession` records.
 - Parent dashboard and detail pages force-refresh the server session and clear stale in-memory identity before loading data.
-- Client parent/admin modules retain only in-memory session caches for active auth. Legacy admin migration code can read old `helios_admin_accounts` localStorage data, but active login calls the server API.
+- Client parent/admin modules retain only in-memory session caches for active auth. The legacy admin localStorage migration reader has since been removed, and `/api/admin/import` now returns HTTP 410 without accepting account data.
 - No client-provided parent identity is used as the server authentication source.
 - No new authentication regression was confirmed.
 
@@ -136,13 +136,13 @@ The Prisma schema and route usage cover the requested models:
 
 ## LOW
 
-- **Legacy admin localStorage migration surface**: `lib/client-admin-auth.ts` still contains migration/read helpers for old localStorage admin accounts, including client-visible password hashes. Active authentication uses server sessions, and the import route refuses to import when admin accounts already exist, but the legacy surface should be removed or isolated in a planned cleanup.
+- **Legacy admin localStorage migration surface — resolved**: the localStorage account/password-hash reader and migration helper have been removed, and the compatibility import route is disabled with HTTP 410.
 
 # Final Assessment
 
 READY
 
-The HIGH admin data exposure is remediated and passed the actual API authorization matrix. Parent ownership paths, admin workflow authorization, signed storage design, database persistence, and build checks remain healthy. Medium dashboard storage consistency edges and the low legacy migration surface remain documented and were not changed in this step. The Step 97 attachment feature remains uncommitted and undeployed.
+The HIGH admin data exposure is remediated and passed the actual API authorization matrix. Parent ownership paths, admin workflow authorization, signed storage design, database persistence, and build checks remain healthy. Medium dashboard storage consistency edges remain documented. The legacy admin migration surface has since been removed.
 
 Validation completed:
 

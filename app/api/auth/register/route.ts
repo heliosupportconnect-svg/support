@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { createSession, toSafeParent } from '@/lib/auth'
 import { hashPassword } from '@/lib/password'
 import { prisma } from '@/lib/prisma'
+import { matchesExistingStudent } from '@/lib/registration-student'
 
 type RegistrationInput = {
   name: string
@@ -74,14 +75,6 @@ function parseRegistrationInput(value: unknown): RegistrationInput | null {
   return input
 }
 
-function splitStudentName(name: string): { firstName: string; lastName: string } {
-  const parts = name.split(/\s+/)
-  return {
-    firstName: parts[0] ?? name,
-    lastName: parts.slice(1).join(' ') || parts[0] || name,
-  }
-}
-
 export async function POST(request: Request) {
   let input: RegistrationInput | null
 
@@ -96,8 +89,12 @@ export async function POST(request: Request) {
   }
 
   try {
+    const student = await prisma.student.findUnique({ where: { admissionNumber: input.student.admissionNumber } })
+    if (!student || !matchesExistingStudent(input.student, student)) {
+      return NextResponse.json({ error: 'Student details could not be verified. Contact school administration.' }, { status: 403 })
+    }
+
     const passwordHash = await hashPassword(input.password)
-    const { firstName, lastName } = splitStudentName(input.student.name)
     const relationshipType = input.relationship.toLowerCase() === 'other'
       ? 'OTHER'
       : 'PARENT_GUARDIAN'
@@ -111,21 +108,6 @@ export async function POST(request: Request) {
           emergencyPhone: input.emergencyPhone || null,
           passwordHash,
           role: 'PARENT',
-        },
-      })
-
-      const student = await transaction.student.create({
-        data: {
-          admissionNumber: input.student.admissionNumber,
-          firstName,
-          lastName,
-          className: input.student.className,
-          section: input.student.section,
-          rollNumber: input.student.rollNumber,
-          house: input.student.house,
-          modeOfTransport: input.student.busNumber ? 'School Bus' : 'Self Transport',
-          busNumber: input.student.busNumber || null,
-          busRoute: input.student.busRoute || null,
         },
       })
 

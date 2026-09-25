@@ -25,28 +25,20 @@ export async function PATCH(request: Request) {
   const email = stringField(input, 'email').toLowerCase()
   const phone = stringField(input, 'phone')
   const emergencyPhone = stringField(input, 'emergencyPhone')
-  const className = stringField(input, 'className')
-  const section = stringField(input, 'section')
-  if (!name || !email || !phone || !className || !section) {
+  if (!name || !email || !phone) {
     return NextResponse.json({ error: 'Required profile fields are missing.' }, { status: 400 })
   }
 
   try {
-    const updated = await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: current.id },
-        data: { name, email, phone, emergencyPhone: emergencyPhone || null },
-      })
-      const link = await tx.parentStudent.findFirst({ where: { userId: current.id } })
-      if (!link) throw new Error('Student relationship not found.')
-      await tx.student.update({ where: { id: link.studentId }, data: { className, section } })
-      return tx.user.findUnique({
-        where: { id: current.id },
-        include: { studentLinks: { include: { student: true } } },
-      })
+    const updated = await prisma.user.update({
+      where: { id: current.id },
+      data: { name, email, phone, emergencyPhone: emergencyPhone || null },
     })
-
-    return NextResponse.json({ parent: updated ? toSafeParent(updated) : null })
+    const parent = await prisma.user.findUnique({
+      where: { id: updated.id },
+      include: { studentLinks: { include: { student: true } } },
+    })
+    return NextResponse.json({ parent: parent ? toSafeParent(parent) : null })
   } catch {
     return NextResponse.json({ error: 'Unable to update profile.' }, { status: 409 })
   }

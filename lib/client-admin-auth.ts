@@ -1,7 +1,5 @@
 "use client";
 
-export const ADMIN_ACCOUNT_KEY = "helios_admin_account";
-export const ADMIN_ACCOUNTS_KEY = "helios_admin_accounts";
 export const ADMIN_SESSION_KEY = "helios_admin_session";
 
 export const ADMIN_ROLES = ["VP_PRIMARY", "VP_SECONDARY", "PRINCIPAL", "DIRECTOR"] as const;
@@ -14,7 +12,6 @@ export type LocalAdminAccount = {
   email: string;
   mobile: string;
   role: AdminRole;
-  passwordHash: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -37,10 +34,6 @@ export type AdminSetupData = {
 let currentSession: LocalAdminSession | null = null;
 const adminAccountCache = new Map<string, LocalAdminAccount>();
 
-function isBrowser(): boolean {
-  return typeof window !== "undefined";
-}
-
 function normalizeUsername(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase().replace(/\s+/g, "") : "";
 }
@@ -49,11 +42,10 @@ function isAdminRole(value: unknown): value is AdminRole {
   return typeof value === "string" && ADMIN_ROLES.includes(value as AdminRole);
 }
 
-function repairLocalAccount(value: unknown, requirePasswordHash = false): LocalAdminAccount | null {
+function repairLocalAccount(value: unknown): LocalAdminAccount | null {
   if (typeof value !== "object" || value === null) return null;
   const candidate = value as Record<string, unknown>;
   if (!isAdminRole(candidate.role) || typeof candidate.id !== "string") return null;
-  if (requirePasswordHash && (typeof candidate.passwordHash !== "string" || !candidate.passwordHash)) return null;
 
   const createdAt = typeof candidate.createdAt === "string" ? candidate.createdAt : new Date().toISOString();
   return {
@@ -63,42 +55,9 @@ function repairLocalAccount(value: unknown, requirePasswordHash = false): LocalA
     email: typeof candidate.email === "string" ? candidate.email.trim().toLowerCase() : "",
     mobile: typeof candidate.mobile === "string" ? candidate.mobile.trim() : "",
     role: candidate.role,
-    passwordHash: typeof candidate.passwordHash === "string" ? candidate.passwordHash : "",
     createdAt,
     updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : createdAt,
   };
-}
-
-export function getLocalAdminAccounts(): LocalAdminAccount[] {
-  if (!isBrowser()) return [];
-  try {
-    const raw = window.localStorage.getItem(ADMIN_ACCOUNTS_KEY);
-    const value: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(value)
-      ? value.map((item) => repairLocalAccount(item, true)).filter((account): account is LocalAdminAccount => account !== null)
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-export async function migrateLocalAdminAccounts(): Promise<number> {
-  const accounts = getLocalAdminAccounts();
-  if (accounts.length === 0) return 0;
-
-  const response = await fetch("/api/admin/import", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ accounts }),
-  });
-  if (!response.ok) throw new Error("Unable to import admin accounts.");
-
-  const result = (await response.json()) as { imported?: number };
-  return result.imported ?? 0;
-}
-
-export async function ensureDefaultAdminAccounts(): Promise<LocalAdminAccount[]> {
-  return getLocalAdminAccounts();
 }
 
 function cacheAccount(account: LocalAdminAccount): LocalAdminAccount {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { CarouselSlide } from '@prisma/client'
 import { getCurrentAdmin } from '@/lib/admin-auth'
 import { prepareCarouselImage } from '@/lib/carousel-image'
+import { parseDashboardSlidePayload } from '@/lib/dashboard-slide-input'
 import { prisma } from '@/lib/prisma'
 import { createSignedObjectUrl, createStorageKey, DASHBOARD_IMAGES_BUCKET, deleteObject, uploadObject } from '@/lib/object-storage'
 
@@ -16,7 +17,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   let form: FormData
   try { form = await request.formData() } catch { return NextResponse.json({ error: 'Invalid update.' }, { status: 400 }) }
   const file = form.get('image')
-  const payload = JSON.parse(typeof form.get('payload') === 'string' ? String(form.get('payload')) : '{}') as Record<string, unknown>
+  const payload = parseDashboardSlidePayload(form.get('payload'))
+  if (!payload) return NextResponse.json({ error: 'Invalid update.' }, { status: 400 })
   let uploadedStorageKey: string | null = null
   let slide: CarouselSlide
   let existing: CarouselSlide

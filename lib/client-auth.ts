@@ -160,26 +160,6 @@ export async function loginLocalParent(phone: string, password: string, _remembe
   return parent ? setCurrentParent(parent) : null;
 }
 
-export async function updateLocalParentStudentPlacement(studentClass: string, section: string): Promise<LocalParentAccount | null> {
-  if (!currentParent) return null;
-  const response = await fetch("/api/auth/profile", {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      name: currentParent.name,
-      email: currentParent.email,
-      phone: currentParent.phone,
-      emergencyPhone: currentParent.emergencyPhone ?? "",
-      className: studentClass,
-      section,
-    }),
-  });
-  const result = await readResponse(response);
-  if (!response.ok || !result.parent) throw new Error(result.error ?? "Unable to update the Neon student profile.");
-  const parent = readParent(result.parent);
-  return parent ? setCurrentParent(parent) : null;
-}
-
 export function logoutLocalParent(): void {
   currentParent = null;
   currentSession = null;

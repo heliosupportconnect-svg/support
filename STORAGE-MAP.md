@@ -21,7 +21,7 @@ Read:
 - `app/api/admin/me/route.ts`, `app/api/admin/accounts/route.ts`, and `lib/admin-auth.ts` read safe identities.
 
 Live:
-Yes. Neon is authoritative. `helios_admin_accounts` is legacy migration code only.
+Yes. Neon is authoritative. The legacy `helios_admin_accounts` browser key is unused, and the old import route is disabled.
 
 ## Admin Sessions
 Storage:
@@ -336,7 +336,7 @@ Conclusion: **NEW persistent data is fully Neon-backed**. There are zero active 
 | Ticket attachment file | `ticket-attachments` private bucket | `POST /api/tickets` -> `uploadObject` | No | Yes; protected reads use signed URLs |
 | Dashboard slide metadata | Neon `CarouselSlide` | Admin carousel -> `POST/PATCH/DELETE /api/admin/slides` | No | Reference only; metadata is in Neon |
 | Dashboard image file | `dashboard-images` private bucket | Admin carousel -> `uploadObject` before `CarouselSlide` write | No | Yes; reads use signed URLs |
-| Admin account | Neon `AdminAccount` | Server seed/import or admin account API; normal reads use `/api/admin/accounts` | No; legacy import helper is unused | No |
+| Admin account | Neon `AdminAccount` | Existing server provisioning; reads use `/api/admin/accounts`; legacy import route returns 410 | No | No |
 | Admin profile changes | Neon `AdminAccount` | Admin profile client -> `PATCH /api/admin/profile` | No | No |
 | Admin password changes | Neon `AdminAccount.passwordHash` | Admin profile client -> `PATCH /api/admin/password` | No | No |
 | Admin session | Neon `AdminSession` plus HttpOnly `helios_admin_session` cookie | Admin login/logout server actions | No; cookie is server-managed auth state | No |
@@ -349,12 +349,13 @@ Conclusion: **NEW persistent data is fully Neon-backed**. There are zero active 
 - Admin page `storage` listeners only trigger fresh server reads when legacy keys change. They do not read legacy values, write browser storage, or issue updates based on legacy payloads.
 - Ticket loading always calls `/api/tickets` or `/api/tickets/[ticketNumber]`. There is no empty-result fallback to `helios_parent_tickets`.
 - Upload failures return real HTTP errors. No upload route saves file bytes, `blob:` URLs, or metadata to browser storage.
-- `/api/admin/import` and `migrateLocalAdminAccounts` are legacy explicit-import compatibility code. The client helper has no call sites, and no login, registration, refresh, hydration, or API route invokes it automatically. It is not part of the new runtime source of truth.
+- JPEG dashboard uploads are normalized using EXIF orientation. PNG uploads remain byte-for-byte unchanged because the installed Sharp/libvips pipeline does not reliably expose orientation from PNG `eXIf` metadata.
+- `/api/admin/import` is a disabled compatibility route that returns HTTP 410. The browser migration helper and local password-hash reader have been removed.
 
 # REMAINING BROWSER STORAGE
 
-- `window.localStorage.getItem("helios_admin_accounts")` in `lib/client-admin-auth.ts` — **A. LEGACY DATA READ ONLY**. It is used only by the unused explicit admin migration helper; it is not used by current admin login, profile, dashboard, or session hydration.
-- `helios_parent_account`, `helios_parent_session`, `helios_parent_tickets`, `helios_dashboard_slides`, `helios_admin_account`, `helios_admin_accounts`, and `helios_admin_session` constants — **F. UNUSED/DEAD CODE** as browser persistence keys. They are retained for legacy compatibility/documentation and have no active read/write path except the single admin-account legacy read above.
+- `helios_parent_account`, `helios_parent_session`, `helios_parent_tickets`, `helios_dashboard_slides`, and `helios_admin_accounts` — **F. UNUSED/DEAD CODE** as legacy browser storage keys; no application code reads or writes them.
+- `helios_admin_session` — in-memory key name retained only for UI storage-event refresh listeners; authentication authority remains the server-backed HttpOnly cookie.
 - `StorageEvent` listeners mentioning legacy keys in admin pages and the home page — **C. UI/TEMPORARY STATE**. They only request a fresh API read; they do not read the event's stored value or persist application data.
 - `URL.createObjectURL(file)` in `app/admin/carousel/page.tsx` — **C. UI/TEMPORARY STATE**. It is an in-memory upload preview only; the URL is never sent to an API, written to Neon, or stored in browser persistence. The server receives the actual `File` bytes and stores them in `dashboard-images`.
 - `cookies()` in `lib/auth.ts`, `lib/admin-auth.ts`, auth routes, and `middleware.ts` — **D. AUTH/SESSION STATE**. These are HttpOnly server-managed cookies backed by Neon `Session` or `AdminSession`, not localStorage/sessionStorage.

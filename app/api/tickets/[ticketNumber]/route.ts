@@ -5,6 +5,8 @@ import { canAccessAdminTicket } from '@/lib/admin-ticket-access'
 import { prisma } from '@/lib/prisma'
 import { mapTicket } from '@/app/api/tickets/route'
 import { parseLegacyTicketNumber, parseTicketNumber } from '@/lib/ticket-number'
+import { isParentTicketOwner } from '@/lib/ticket-access'
+import { validateEscalationMutation } from '@/lib/ticket-policy'
 
 const includeTicket = {
   student: true,
@@ -50,9 +52,9 @@ export async function GET(_request: Request, context: { params: Promise<{ ticket
       include: includeTicket,
     })
     if (!ticket) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
-    if (parent && ticket.reporterId !== parent.id) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    if (parent && !isParentTicketOwner(parent.id, ticket.reporterId)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     if (admin && !canAccessAdminTicket(admin.account, ticket)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
-    return NextResponse.json({ ticket: mapTicket(ticket) })
+    return NextResponse.json({ ticket: mapTicket(ticket, admin ? 'admin' : 'parent') })
   } catch {
     return NextResponse.json({ error: 'Unable to load ticket from Neon.' }, { status: 503 })
   }
@@ -80,6 +82,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ ticke
       return NextResponse.json({ error: 'This ticket is read-only after escalation.' }, { status: 403 })
     }
 
+    const escalationError = validateEscalationMutation(admin.account.role, existing.status, existing.escalatedTo, body)
+    if (escalationError) return NextResponse.json({ error: 'Escalation is not allowed for this ticket or role.' }, { status: escalationError })
+
     const status = databaseStatus(body.status)
     const priority = databasePriority(body.priority)
     const update: Record<string, unknown> = {}
@@ -88,12 +93,23 @@ export async function PATCH(request: Request, context: { params: Promise<{ ticke
     if (typeof body.assignedTo === 'string') update.schoolName = body.assignedTo
     if (typeof body.assignedAdminId === 'string') update.assignedAdminId = body.assignedAdminId
     if (typeof body.assignedAdminRole === 'string') update.assignedAdminRole = body.assignedAdminRole
-    if (typeof body.takenUpBy === 'string') update.takenUpBy = body.takenUpBy
-    if (typeof body.takenUpAt === 'string') update.takenUpAt = new Date(body.takenUpAt)
-    if (Array.isArray(body.takenUpByAdminIds)) update.takenUpByAdminIds = body.takenUpByAdminIds
-    if (body.takenUpAtByAdmin && typeof body.takenUpAtByAdmin === 'object') update.takenUpAtByAdmin = body.takenUpAtByAdmin
-    if (Array.isArray(body.escalatedTo)) update.escalatedTo = body.escalatedTo
-    if (typeof body.escalatedAt === 'string') update.escalatedAt = new Date(body.escalatedAt)
+    const hasTakeUpMutation = ['takenUpBy', 'takenUpAt', 'takenUpByAdminIds', 'takenUpAtByAdmin'].some((key) => Object.prototype.hasOwnProperty.call(body, key))
+    if (hasTakeUpMutation && status !== 'IN_PROGRESS') return NextResponse.json({ error: 'Taking up a ticket requires In Progress status.' }, { status: 400 })
+    if (hasTakeUpMutation) {
+      const now = new Date()
+      const existingIds = Array.isArray(existing.takenUpByAdminIds) ? existing.takenUpByAdminIds.filter((value): value is string => typeof value === 'string') : []
+      const timestamps = typeof existing.takenUpAtByAdmin === 'object' && existing.takenUpAtByAdmin !== null && !Array.isArray(existing.takenUpAtByAdmin)
+        ? existing.takenUpAtByAdmin as Record<string, string>
+        : {}
+      update.takenUpBy = existing.takenUpBy ?? admin.account.adminId
+      update.takenUpAt = existing.takenUpAt ?? now
+      update.takenUpByAdminIds = Array.from(new Set([...existingIds, admin.account.adminId]))
+      update.takenUpAtByAdmin = { ...timestamps, [admin.account.adminId]: timestamps[admin.account.adminId] ?? now.toISOString() }
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'escalatedTo')) {
+      update.escalatedTo = body.escalatedTo
+      update.escalatedAt = new Date()
+    }
     if (status === 'RESOLVED') {
       update.resolvedBy = admin.account.adminId
       update.resolvedAt = new Date()
@@ -119,7 +135,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ ticke
       }
       return tx.ticket.findUnique({ where: { id: existing.id }, include: includeTicket })
     })
-    return NextResponse.json({ ticket: ticket ? mapTicket(ticket) : null })
+    return NextResponse.json({ ticket: ticket ? mapTicket(ticket, 'admin') : null })
   } catch {
     return NextResponse.json({ error: 'Unable to save the ticket to Neon.' }, { status: 503 })
   }

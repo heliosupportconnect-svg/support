@@ -5,7 +5,9 @@ import { getCurrentParent } from '@/lib/auth'
 import { getAdminTicketVisibilityWhere } from '@/lib/admin-ticket-access'
 import { prisma } from '@/lib/prisma'
 import { createStorageKey, deleteObject, TICKET_ATTACHMENTS_BUCKET, uploadObject } from '@/lib/object-storage'
-import { formatTicketNumber } from '@/lib/ticket-number'
+import { formatTicketIdentifier } from '@/lib/ticket-number'
+import { selectTicketHistory } from '@/lib/ticket-history'
+import { normalizeStudentClass, normalizeStudentSection } from '@/lib/ticket-policy'
 import type { LocalTicket, TicketProfileSnapshot } from '@/lib/local-tickets'
 
 function localStatus(status: string): LocalTicket['status'] {
@@ -35,26 +37,25 @@ const includeTicket = {
 
 type TicketWithRelations = Prisma.TicketGetPayload<{ include: typeof includeTicket }>
 
-export function mapTicket(ticket: TicketWithRelations): LocalTicket {
+export function mapTicket(ticket: TicketWithRelations, audience: 'parent' | 'admin'): LocalTicket {
+  const history = selectTicketHistory(ticket.activities, ticket.notes, audience, ticket.reporterId)
   const activities = [
-    ...(ticket.activities ?? []).map((activity) => ({
+    ...(history.activities ?? []).map((activity) => ({
     title: activity.type === 'NOTE_ADDED' ? 'Internal Note Added' : activity.type === 'FILE_UPLOADED' ? 'Attachment Uploaded' : activity.type === 'STATUS_CHANGED' ? 'Ticket Status Updated' : activity.type === 'ASSIGNED' ? 'Ticket Assigned' : activity.type === 'COMMENTED' ? 'Comment Added' : 'Ticket Updated',
     description: activity.message,
     createdAt: activity.createdAt.toISOString(),
     actor: activity.actor?.name ?? activity.actorAdminId ?? undefined,
     })),
-    ...(ticket.notes ?? []).map((note) => ({
+    ...(history.notes ?? []).map((note) => ({
       title: 'Internal Note Added',
       description: note.body,
       createdAt: note.createdAt.toISOString(),
       actor: note.author?.name ?? note.authorAdminId ?? undefined,
     })),
   ].sort((first, second) => first.createdAt.localeCompare(second.createdAt))
-  return {
-    id: ticket.id,
-    ticketNumber: formatTicketNumber(ticket.ticketNumber).slice(1),
-    parentId: ticket.reporterId,
-    studentId: ticket.studentId ?? ticket.student?.admissionNumber ?? '',
+  const mapped: LocalTicket = {
+    ticketNumber: formatTicketIdentifier(ticket.ticketNumber),
+    studentId: ticket.student?.admissionNumber ?? '',
     category: ticket.category,
     subject: ticket.title,
     description: ticket.description,
@@ -62,18 +63,8 @@ export function mapTicket(ticket: TicketWithRelations): LocalTicket {
     priority: ticket.priority === 'URGENT' ? 'URGENT' : ticket.priority === 'HIGH' ? 'HIGH' : 'NORMAL',
     parentSnapshot: ticketSnapshot(ticket.parentSnapshot),
     studentSnapshot: ticketSnapshot(ticket.studentSnapshot),
-    assignedTo: ticket.schoolName ?? undefined,
-    assignedBy: ticket.assignedAdminId ?? undefined,
-    assignedAdminId: ticket.assignedAdminId ?? undefined,
-    assignedAdminRole: ticket.assignedAdminRole ?? undefined,
     escalatedTo: Array.isArray(ticket.escalatedTo) ? ticket.escalatedTo as string[] : undefined,
     escalatedAt: ticket.escalatedAt?.toISOString(),
-    takenUpBy: ticket.takenUpBy ?? undefined,
-    takenUpAt: ticket.takenUpAt?.toISOString(),
-    takenUpByAdminIds: Array.isArray(ticket.takenUpByAdminIds) ? ticket.takenUpByAdminIds as string[] : undefined,
-    takenUpAtByAdmin: typeof ticket.takenUpAtByAdmin === 'object' && ticket.takenUpAtByAdmin ? ticket.takenUpAtByAdmin as Record<string, string> : undefined,
-    resolvedBy: ticket.resolvedBy ?? undefined,
-    resolvedAt: ticket.resolvedAt?.toISOString(),
     attachmentNames: (ticket.attachments ?? []).map((attachment) => attachment.fileName),
     createdAt: ticket.createdAt.toISOString(),
     updatedAt: ticket.updatedAt.toISOString(),
@@ -83,30 +74,48 @@ export function mapTicket(ticket: TicketWithRelations): LocalTicket {
       fileName: attachment.fileName,
       mimeType: attachment.mimeType,
       sizeBytes: attachment.sizeBytes,
-      url: `/api/tickets/${encodeURIComponent(ticket.ticketNumber)}/attachments/${encodeURIComponent(attachment.id)}`,
+      url: `/api/tickets/${encodeURIComponent(formatTicketIdentifier(ticket.ticketNumber))}/attachments/${encodeURIComponent(attachment.id)}`,
     })),
-  } as LocalTicket
+  }
+  if (audience === 'admin') {
+    Object.assign(mapped, {
+      parentId: ticket.reporterId,
+      assignedTo: ticket.schoolName ?? undefined,
+      assignedBy: ticket.assignedAdminId ?? undefined,
+      assignedAdminId: ticket.assignedAdminId ?? undefined,
+      assignedAdminRole: ticket.assignedAdminRole ?? undefined,
+      takenUpBy: ticket.takenUpBy ?? undefined,
+      takenUpAt: ticket.takenUpAt?.toISOString(),
+      takenUpByAdminIds: Array.isArray(ticket.takenUpByAdminIds) ? ticket.takenUpByAdminIds as string[] : undefined,
+      takenUpAtByAdmin: typeof ticket.takenUpAtByAdmin === 'object' && ticket.takenUpAtByAdmin ? ticket.takenUpAtByAdmin as Record<string, string> : undefined,
+      resolvedBy: ticket.resolvedBy ?? undefined,
+      resolvedAt: ticket.resolvedAt?.toISOString(),
+    })
+  }
+  return mapped
 }
 
 async function getVisibleTickets() {
   const admin = await getCurrentAdmin()
   if (admin) {
-    return prisma.ticket.findMany({ where: getAdminTicketVisibilityWhere(admin.account), include: includeTicket, orderBy: { createdAt: 'desc' } })
+    const tickets = await prisma.ticket.findMany({ where: getAdminTicketVisibilityWhere(admin.account), include: includeTicket, orderBy: { createdAt: 'desc' } })
+    return { tickets, audience: 'admin' as const }
   }
   const parent = await getCurrentParent()
   if (!parent) return null
-  return prisma.ticket.findMany({
+  const tickets = await prisma.ticket.findMany({
     where: { reporterId: parent.id },
     include: includeTicket,
     orderBy: { createdAt: 'desc' },
   })
+  return { tickets, audience: 'parent' as const }
 }
 
 export async function GET() {
   try {
-    const tickets = await getVisibleTickets()
-    if (!tickets) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    return NextResponse.json({ tickets: tickets.map(mapTicket) })
+    const result = await getVisibleTickets()
+    if (!result) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    return NextResponse.json({ tickets: result.tickets.map((ticket) => mapTicket(ticket, result.audience)) })
   } catch {
     return NextResponse.json({ error: 'Unable to load tickets from Neon.' }, { status: 503 })
   }
@@ -130,13 +139,12 @@ export async function POST(request: Request) {
   const subject = typeof payload.subject === 'string' ? payload.subject.trim() : ''
   const description = typeof payload.description === 'string' ? payload.description.trim() : ''
   const category = typeof payload.category === 'string' ? payload.category.trim() : 'Academic'
-  const className = typeof payload.className === 'string' ? payload.className.trim() : parent.student.className
-  const section = typeof payload.section === 'string' ? payload.section.trim() : parent.student.section
-  if (!subject || !description || !className || !section) {
-    return NextResponse.json({ error: 'Subject, description, class, and section are required.' }, { status: 400 })
+  if (!subject || !description) {
+    return NextResponse.json({ error: 'Subject and description are required.' }, { status: 400 })
   }
 
   const requestedStudentId = typeof payload.studentId === 'string' ? payload.studentId.trim() : ''
+  if (!requestedStudentId) return NextResponse.json({ error: 'A linked student must be selected.' }, { status: 400 })
   const studentLink = await prisma.parentStudent.findFirst({
     where: {
       userId: parent.id,
@@ -155,11 +163,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'The selected student is not linked to this parent account.' }, { status: 403 })
   }
 
+  const student = studentLink.student
+  const className = normalizeStudentClass(student.className)
+  const section = normalizeStudentSection(student.section)
+  if (!className || !section) return NextResponse.json({ error: 'The linked student placement is not configured.' }, { status: 409 })
+  const studentName = `${student.firstName} ${student.lastName}`.trim()
+
   const parentSnapshot = {
     parentName: parent.name, email: parent.email, phone: parent.phone, emergencyPhone: parent.emergencyPhone,
-    relationship: parent.relationship, studentName: parent.student.name, admissionNumber: parent.student.admissionNumber,
-    className, section, rollNumber: parent.student.rollNumber, house: parent.student.house,
-    modeOfTransport: parent.student.modeOfTransport, busNumber: parent.student.busNumber, busRoute: parent.student.busRoute,
+    relationship: studentLink.relationshipType === 'OTHER' ? 'Other' : 'Parent/Guardian', studentName, admissionNumber: student.admissionNumber,
+    className, section, rollNumber: student.rollNumber, house: student.house,
+    modeOfTransport: student.modeOfTransport, busNumber: student.busNumber, busRoute: student.busRoute,
   }
   const studentSnapshot = { ...parentSnapshot }
   const storageItems: { key: string; file: File }[] = []
@@ -184,7 +198,7 @@ export async function POST(request: Request) {
           description,
           category: databaseCategory(category) as never,
           reporterId: parent.id,
-          studentId: studentLink.student.id,
+          studentId: student.id,
           parentSnapshot,
           studentSnapshot,
         },
@@ -200,7 +214,7 @@ export async function POST(request: Request) {
       return tx.ticket.findUnique({ where: { id: created.id }, include: includeTicket })
     })
 
-    return NextResponse.json({ ticket: ticket ? mapTicket(ticket) : null }, { status: 201 })
+    return NextResponse.json({ ticket: ticket ? mapTicket(ticket, 'parent') : null }, { status: 201 })
   } catch {
     await Promise.all(uploadedKeys.map((key) => deleteObject(TICKET_ATTACHMENTS_BUCKET, key).catch(() => undefined)))
     return NextResponse.json({ error: 'Unable to save the ticket to Neon.' }, { status: 503 })

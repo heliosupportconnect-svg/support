@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getParentSession, type LocalParentAccount } from "@/lib/client-auth";
-import { getLocalTicketForParent, getTicketStatusLabel, updateLocalTicket, type LocalTicket } from "@/lib/local-tickets";
+import { getLocalTicketForParent, getTicketStatusLabel, replyToLocalTicket, type LocalTicket } from "@/lib/local-tickets";
 
 const stages = ["Submitted", "In Progress", "Resolved"];
 function formatDate(value: string) { return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
@@ -32,7 +32,7 @@ export default function ParentTicketDetailsPage() {
       if (!active) return;
       if (!current) { router.replace("/login"); return; }
       setParent(current.parent);
-      setTicket(await getLocalTicketForParent(ticketNumber, current.parent.id));
+      setTicket(await getLocalTicketForParent(ticketNumber));
       setReady(true);
     }).catch(() => setReady(true));
     return () => { active = false; };
@@ -72,9 +72,7 @@ export default function ParentTicketDetailsPage() {
     const currentParent = parent;
     if (!reply.trim() || !currentTicket || !currentParent) return;
     try {
-      const updated = await updateLocalTicket(currentTicket.ticketNumber, {
-        activities: [...currentTicket.activities, { title: "Comment Added", description: reply.trim(), createdAt: new Date().toISOString(), actor: currentParent.name }],
-      });
+      const updated = await replyToLocalTicket(currentTicket.ticketNumber, reply.trim());
       if (updated) setTicket(updated);
       setReply("");
       setReplyMessage("Your update has been saved to Neon.");

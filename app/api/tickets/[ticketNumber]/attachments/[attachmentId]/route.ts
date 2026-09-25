@@ -3,6 +3,7 @@ import { getCurrentParent } from '@/lib/auth'
 import { createSignedObjectUrl, TICKET_ATTACHMENTS_BUCKET } from '@/lib/object-storage'
 import { prisma } from '@/lib/prisma'
 import { parseLegacyTicketNumber, parseTicketNumber } from '@/lib/ticket-number'
+import { isParentTicketOwner } from '@/lib/ticket-access'
 
 export async function GET(_request: Request, context: { params: Promise<{ ticketNumber: string; attachmentId: string }> }) {
   const parent = await getCurrentParent()
@@ -21,7 +22,7 @@ export async function GET(_request: Request, context: { params: Promise<{ ticket
       include: { ticket: { select: { reporterId: true, studentSnapshot: true, student: true } } },
     })
     if (!attachment) return NextResponse.json({ error: 'Attachment not found.' }, { status: 404 })
-    if (attachment.ticket.reporterId !== parent.id) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    if (!isParentTicketOwner(parent.id, attachment.ticket.reporterId)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     if (!attachment.storageKey) return NextResponse.json({ error: 'Attachment storage reference is missing.' }, { status: 503 })
     return NextResponse.redirect(await createSignedObjectUrl(TICKET_ATTACHMENTS_BUCKET, attachment.storageKey))
   } catch {

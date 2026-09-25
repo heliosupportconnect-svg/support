@@ -486,7 +486,7 @@ export default function AdminDashboardPage() {
                     </div>
                   ) : (
                     currentPrimaryView.filter((ticket) => !["RESOLVED", "CLOSED"].includes(ticket.status)).map((ticket) => (
-                      <article key={ticket.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <article key={ticket.ticketNumber} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -517,7 +517,7 @@ export default function AdminDashboardPage() {
                     </div>
                   ) : (
                     currentPrimaryView.filter((ticket) => ["RESOLVED", "CLOSED"].includes(ticket.status)).map((ticket) => (
-                      <article key={ticket.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <article key={ticket.ticketNumber} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -590,7 +590,7 @@ export default function AdminDashboardPage() {
                     </div>
                   ) : (
                     currentSecondaryView.filter((ticket) => !["RESOLVED", "CLOSED"].includes(ticket.status)).map((ticket) => (
-                      <article key={ticket.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <article key={ticket.ticketNumber} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -621,7 +621,7 @@ export default function AdminDashboardPage() {
                     </div>
                   ) : (
                     currentSecondaryView.filter((ticket) => ["RESOLVED", "CLOSED"].includes(ticket.status)).map((ticket) => (
-                      <article key={ticket.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <article key={ticket.ticketNumber} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -681,7 +681,7 @@ export default function AdminDashboardPage() {
                   </div>
                 ) : (
                   myQueue.map((ticket) => (
-                    <article key={ticket.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <article key={ticket.ticketNumber} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -879,7 +879,7 @@ function renderVpDashboard({
               </div>
             ) : (
               visibleActive.map((ticket) => (
-                <article key={ticket.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <article key={ticket.ticketNumber} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -919,7 +919,7 @@ function renderVpDashboard({
                 const resolvedByBadge = getResolvedByBadge(ticket);
 
                 return (
-                  <article key={ticket.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <article key={ticket.ticketNumber} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -958,7 +958,7 @@ function renderVpDashboard({
               </div>
             ) : (
               visibleEscalated.map((ticket) => (
-                <article key={ticket.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <article key={ticket.ticketNumber} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">

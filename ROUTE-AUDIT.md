@@ -109,7 +109,7 @@ None. No expected route file or required supporting file listed in this audit is
 ## Extra/Legacy Files
 
 - `app/admin/profile/page.tsx`: additional active admin profile route; it supports the admin workflow and is not a replacement for any expected route.
-- `app/api/admin/import/route.ts`: explicit legacy admin-account import compatibility endpoint. It is an extra API route, not a replacement for normal admin authentication or account APIs.
+- `app/api/admin/import/route.ts`: retained as a disabled compatibility route that returns HTTP 410; it cannot create or seed admin accounts.
 - `app/favicon.ico`, `app/globals.css`, and `app/layout.tsx`: normal App Router support files, not missing routes.
 - `lib/local-tickets.ts`: legacy-compatible naming remains, but the helper calls server APIs rather than local persistence.
 - `lib/dashboard-slides.ts`: legacy-compatible naming remains, but the helper calls the dashboard slide API.

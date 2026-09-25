@@ -13,15 +13,15 @@ export type TicketProfileSnapshot = {
   modeOfTransport?: "Self Transport" | "School Bus"; busNumber?: string; busRoute?: string;
 };
 export type LocalTicket = {
-  id: string; ticketNumber: string; parentId: string; studentId: string; category: string; subject: string; description: string;
+  ticketNumber: string; parentId?: string; studentId: string; category: string; subject: string; description: string;
   status: LocalTicketStatus; priority: LocalTicketPriority; parentSnapshot?: TicketProfileSnapshot; studentSnapshot?: TicketProfileSnapshot;
   assignedTo?: string; assignedBy?: string; assignedAdminId?: string; assignedAdminRole?: string; escalatedTo?: string[]; escalatedAt?: string;
   takenUpBy?: string; takenUpAt?: string; takenUpByAdminIds?: string[]; takenUpAtByAdmin?: Record<string, string>;
   resolvedBy?: string; resolvedAt?: string; attachmentNames: string[]; createdAt: string; updatedAt: string; activities: LocalTicketActivity[];
   attachments?: { id: string; fileName: string; mimeType: string; sizeBytes?: number | null; url?: string | null }[];
 };
-export type CreateLocalTicketInput = Pick<LocalTicket, "parentId" | "studentId" | "category" | "subject" | "description" | "attachmentNames"> & {
-  parentSnapshot?: TicketProfileSnapshot; studentSnapshot?: TicketProfileSnapshot; className?: string; section?: string; attachment?: File;
+export type CreateLocalTicketInput = Pick<LocalTicket, "studentId" | "category" | "subject" | "description" | "attachmentNames"> & {
+  attachment?: File;
 };
 
 function isBrowser(): boolean { return typeof window !== "undefined"; }
@@ -44,13 +44,11 @@ export async function loadTickets(): Promise<LocalTicket[]> {
   return result.tickets as LocalTicket[];
 }
 
-export async function getLocalTicketsForParent(parentId: string): Promise<LocalTicket[]> {
-  const tickets = await loadTickets();
-  return tickets.filter((ticket) => ticket.parentId === parentId);
+export async function getLocalTicketsForParent(): Promise<LocalTicket[]> {
+  return loadTickets();
 }
-export async function getLocalTicketForParent(ticketNumber: string, parentId: string): Promise<LocalTicket | null> {
-  const ticket = await getLocalTicket(ticketNumber);
-  return ticket?.parentId === parentId ? ticket : null;
+export async function getLocalTicketForParent(ticketNumber: string): Promise<LocalTicket | null> {
+  return getLocalTicket(ticketNumber);
 }
 export async function getLocalTicket(ticketNumber: string): Promise<LocalTicket | null> {
   if (!isBrowser()) return null;
@@ -89,11 +87,24 @@ export async function updateLocalTicket(ticketNumber: string, update: Partial<Lo
   return result.ticket as LocalTicket;
 }
 
+export async function replyToLocalTicket(ticketNumber: string, message: string): Promise<LocalTicket | null> {
+  if (!isBrowser()) return null;
+  const response = await fetch(`/api/tickets/${encodeURIComponent(ticketNumber)}/reply`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+  if (response.status === 404) return null;
+  const result = await responseJson(response);
+  if (!response.ok || !result.ticket) throwResponse(result, "Unable to save your reply.");
+  return result.ticket as LocalTicket;
+}
+
 export function getTicketParentAccount(ticket: LocalTicket): LocalParentAccount | null {
   if (ticket.parentSnapshot) {
     const snapshot = ticket.parentSnapshot;
     return {
-      id: ticket.parentId, name: snapshot.parentName, email: snapshot.email, phone: snapshot.phone, emergencyPhone: snapshot.emergencyPhone,
+      id: ticket.parentId ?? "", name: snapshot.parentName, email: snapshot.email, phone: snapshot.phone, emergencyPhone: snapshot.emergencyPhone,
       relationship: snapshot.relationship, role: "PARENT", createdAt: ticket.createdAt,
       student: { admissionNumber: snapshot.admissionNumber, name: snapshot.studentName, className: snapshot.className, section: snapshot.section, rollNumber: snapshot.rollNumber, house: snapshot.house, relationship: snapshot.relationship ?? "", modeOfTransport: snapshot.modeOfTransport, busNumber: snapshot.busNumber, busRoute: snapshot.busRoute },
     };

@@ -320,8 +320,17 @@ export default function HomePage() {
             >
               <img
                 src={slide.image}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-[-5%] h-[110%] w-[110%] max-w-none object-cover object-center blur-[24px]"
+              />
+
+              <div className="absolute inset-0 bg-black/15" aria-hidden="true" />
+
+              <img
+                src={slide.image}
                 alt={slide.title}
-                className="h-full w-full object-contain object-center"
+                className="relative z-10 h-full w-full object-contain object-center"
               />
             </div>
           ))}

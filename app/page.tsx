@@ -300,7 +300,7 @@ export default function HomePage() {
           HERO CAROUSEL
           ===================================================== */}
       <section
-        className="relative overflow-hidden bg-helios-primary-container"
+        className="relative overflow-hidden bg-[#FAF8FF]"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onTouchStart={handleHeroTouchStart}
@@ -321,10 +321,8 @@ export default function HomePage() {
               <img
                 src={slide.image}
                 alt={slide.title}
-                className="h-full w-full object-cover object-center"
+                className="h-full w-full object-contain object-center"
               />
-
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,9,23,0.76)_0%,rgba(0,9,23,0.52)_34%,rgba(0,9,23,0.24)_58%,rgba(0,9,23,0.08)_100%)]" />
             </div>
           ))}
 

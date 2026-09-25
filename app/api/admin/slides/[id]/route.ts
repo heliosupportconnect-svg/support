@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { CarouselSlide } from '@prisma/client'
 import { getCurrentAdmin } from '@/lib/admin-auth'
+import { prepareCarouselImage } from '@/lib/carousel-image'
 import { prisma } from '@/lib/prisma'
 import { createSignedObjectUrl, createStorageKey, DASHBOARD_IMAGES_BUCKET, deleteObject, uploadObject } from '@/lib/object-storage'
 
@@ -29,7 +30,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024) return NextResponse.json({ error: 'Image must be JPEG or PNG under 5 MB.' }, { status: 400 })
       storageKey = createStorageKey('slides', file.name)
       uploadedStorageKey = storageKey
-      await uploadObject(DASHBOARD_IMAGES_BUCKET, storageKey, Buffer.from(await file.arrayBuffer()), file.type)
+      const preparedImage = await prepareCarouselImage(file)
+      await uploadObject(DASHBOARD_IMAGES_BUCKET, storageKey, preparedImage.body, preparedImage.contentType)
       imageUrl = null
     }
     slide = await prisma.carouselSlide.update({

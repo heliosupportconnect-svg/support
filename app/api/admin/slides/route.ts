@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import type { CarouselSlide } from '@prisma/client'
 import { getCurrentAdmin } from '@/lib/admin-auth'
+import { prepareCarouselImage } from '@/lib/carousel-image'
 import { prisma } from '@/lib/prisma'
 import { createSignedObjectUrl, createStorageKey, DASHBOARD_IMAGES_BUCKET, deleteObject, getObjectStorageEnvironmentStatus, uploadObject } from '@/lib/object-storage'
 
@@ -102,7 +103,8 @@ export async function POST(request: Request) {
       bucket: DASHBOARD_IMAGES_BUCKET,
       environment: getObjectStorageEnvironmentStatus(),
     })
-    await uploadObject(DASHBOARD_IMAGES_BUCKET, storageKey, Buffer.from(await file.arrayBuffer()), file.type)
+    const preparedImage = await prepareCarouselImage(file)
+    await uploadObject(DASHBOARD_IMAGES_BUCKET, storageKey, preparedImage.body, preparedImage.contentType)
   } catch (error) {
     logPublishFailure(requestId, 'storage_upload', error, { bucket: DASHBOARD_IMAGES_BUCKET })
     return failure(requestId, 'storage_upload_failed', 503)

@@ -300,7 +300,7 @@ export default function HomePage() {
           HERO CAROUSEL
           ===================================================== */}
       <section
-        className="relative overflow-hidden bg-[#FAF8FF]"
+        className={`relative overflow-hidden ${currentSlide ? "bg-[#FAF8FF]" : "bg-[#0D2137]"}`}
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onTouchStart={handleHeroTouchStart}
@@ -308,18 +308,13 @@ export default function HomePage() {
         style={{ touchAction: "pan-y" }}
       >
         <div className="relative h-[330px] min-h-[330px] w-full sm:h-[420px] sm:min-h-[420px] md:h-[500px] md:min-h-[500px] lg:h-[520px] lg:min-h-[520px]">
-          {heroSlides.map((slide, index) => (
+          {currentSlide ? (
             <div
-              key={slide.title}
-              className={`absolute inset-0 transition-opacity duration-700 ${
-                activeSlide === index
-                  ? "z-10 opacity-100"
-                  : "z-0 opacity-0"
-              }`}
-              aria-hidden={activeSlide !== index}
+              key={currentSlide.title}
+              className="absolute inset-0 z-10 transition-opacity duration-700"
             >
               <img
-                src={slide.image}
+                src={currentSlide.image}
                 alt=""
                 aria-hidden="true"
                 className="absolute inset-[-5%] h-[110%] w-[110%] max-w-none object-cover object-center blur-[24px]"
@@ -328,30 +323,32 @@ export default function HomePage() {
               <div className="absolute inset-0 bg-black/15" aria-hidden="true" />
 
               <img
-                src={slide.image}
-                alt={slide.title}
+                src={currentSlide.image}
+                alt={currentSlide.title}
                 className="relative z-10 h-full w-full object-contain object-center"
               />
-            </div>
-          ))}
 
-          <div className="absolute inset-x-0 bottom-0 z-20 pb-6 md:pb-8 lg:pb-10">
-            <div className="mx-auto w-full max-w-[1440px] px-4 md:px-8 lg:px-12">
-              {currentSlide ? (
-                <div className="max-w-[560px]">
-                  <span className="mb-2.5 inline-flex rounded-full bg-helios-orange px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-white shadow-sm md:px-3 md:py-1 md:text-[10px]">
-                    {currentSlide.badge}
-                  </span>
+              <div className="absolute inset-x-0 bottom-0 z-20 pb-6 md:pb-8 lg:pb-10">
+                <div className="mx-auto w-full max-w-[1440px] px-4 md:px-8 lg:px-12">
+                  <div className="max-w-[560px]">
+                    <span className="mb-2.5 inline-flex rounded-full bg-helios-orange px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-white shadow-sm md:px-3 md:py-1 md:text-[10px]">
+                      {currentSlide.badge}
+                    </span>
 
-                  <h1 className="text-[26px] font-extrabold leading-[1.08] tracking-[-0.02em] text-white drop-shadow-md sm:text-[32px] md:text-[38px] lg:text-[44px]">
-                    {currentSlide.title}
-                  </h1>
+                    <h1 className="text-[26px] font-extrabold leading-[1.08] tracking-[-0.02em] text-white drop-shadow-md sm:text-[32px] md:text-[38px] lg:text-[44px]">
+                      {currentSlide.title}
+                    </h1>
 
-                  <p className="mt-1.5 text-xs font-medium text-white/90 sm:text-sm md:text-base">
-                    {currentSlide.subtitle}
-                  </p>
+                    <p className="mt-1.5 text-xs font-medium text-white/90 sm:text-sm md:text-base">
+                      {currentSlide.subtitle}
+                    </p>
+                  </div>
                 </div>
-              ) : (
+              </div>
+            </div>
+          ) : (
+            <div className="absolute inset-x-0 bottom-0 z-20 pb-6 md:pb-8 lg:pb-10">
+              <div className="mx-auto w-full max-w-[1440px] px-4 md:px-8 lg:px-12">
                 <div className="max-w-[560px] rounded-2xl border border-white/20 bg-slate-900/20 p-4 backdrop-blur-sm">
                   <span className="mb-2.5 inline-flex rounded-full bg-helios-orange px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-white shadow-sm md:px-3 md:py-1 md:text-[10px]">
                     School Update
@@ -363,26 +360,26 @@ export default function HomePage() {
                     Dashboard updates will appear here as soon as they are published.
                   </p>
                 </div>
-              )}
+              </div>
             </div>
+          )}
 
-            {/* Dots */}
-            <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2">
-              {heroSlides.map((slide, index) => (
-                <button
-                  key={slide.title}
-                  type="button"
-                  aria-label={`Go to slide ${index + 1}`}
-                  aria-current={activeSlide === index}
-                  onClick={() => goToSlide(index)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    activeSlide === index
-                      ? "w-7 bg-helios-orange"
-                      : "w-2 bg-white/65"
-                  }`}
-                />
-              ))}
-            </div>
+          {/* Dots */}
+          <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+            {heroSlides.map((slide, index) => (
+              <button
+                key={slide.title}
+                type="button"
+                aria-label={`Go to slide ${index + 1}`}
+                aria-current={activeSlide === index}
+                onClick={() => goToSlide(index)}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  activeSlide === index
+                    ? "w-7 bg-helios-orange"
+                    : "w-2 bg-white/65"
+                }`}
+              />
+            ))}
           </div>
         </div>
       </section>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { clearLocalAdminSession, getAdminSession, getLocalAdminAccount } from "@/lib/client-admin-auth";
 import { getLocalParent } from "@/lib/client-auth";
+import { getAvailableTicketStatuses } from "@/lib/ticket-policy";
 import {
   getLocalTicket,
   getTicketClassNumber,
@@ -451,6 +452,7 @@ export default function AdminTicketDetailsPage() {
               <h2 className="text-base font-bold">Supporting Attachments</h2>
               {ticket.attachmentNames.length ? (
                 <div className="mt-3 space-y-2">{(ticket.attachments ?? []).map((attachment) => {
+                  if (!attachment.id) return null;
                   const attachmentEndpoint = `/api/admin/attachments/${encodeURIComponent(attachment.id)}`;
                   return (
                     <div key={attachment.id} className="flex flex-col gap-3 rounded-xl bg-helios-surface-low p-3 text-xs font-semibold sm:flex-row sm:items-center sm:justify-between">
@@ -504,9 +506,9 @@ export default function AdminTicketDetailsPage() {
                 <>
                   <label className="mt-4 block text-[11px] font-bold uppercase text-slate-300">Status
                     <select value={status} onChange={(event) => setStatus(event.target.value as LocalTicketStatus)} className="mt-1 w-full rounded-xl bg-white p-2.5 text-sm text-slate-900">
-                      <option value="SUBMITTED">Submitted</option>
-                      <option value="IN_PROGRESS">In Progress</option>
-                      <option value="RESOLVED">Resolved</option>
+                      {getAvailableTicketStatuses(ticket.status).map((nextStatus) => (
+                        <option key={nextStatus} value={nextStatus}>{nextStatus === "IN_PROGRESS" ? "In Progress" : nextStatus === "SUBMITTED" ? "Submitted" : "Resolved"}</option>
+                      ))}
                     </select>
                   </label>
 

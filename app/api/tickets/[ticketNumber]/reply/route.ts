@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
+import { getCurrentAdmin } from '@/lib/admin-auth'
 import { getCurrentParent } from '@/lib/auth'
 import { mapTicket } from '@/app/api/tickets/route'
-import { isParentTicketOwner } from '@/lib/ticket-access'
+import { isParentTicketOwner, resolveTicketAudience } from '@/lib/ticket-access'
 import { parseParentReplyMessage } from '@/lib/parent-reply'
 import { prisma } from '@/lib/prisma'
 import { parseLegacyTicketNumber, parseTicketNumber } from '@/lib/ticket-number'
@@ -10,12 +11,15 @@ const includeTicket = {
   student: true,
   activities: { include: { actor: true }, orderBy: { createdAt: 'asc' as const } },
   notes: { include: { author: true }, orderBy: { createdAt: 'asc' as const } },
-  attachments: { orderBy: { uploadedAt: 'asc' as const } },
+  attachments: { orderBy: [{ uploadedAt: 'asc' as const }, { id: 'asc' as const }] },
 }
 
 export async function POST(request: Request, context: { params: Promise<{ ticketNumber: string }> }) {
+  const admin = await getCurrentAdmin()
   const parent = await getCurrentParent()
-  if (!parent) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+  const audience = resolveTicketAudience(Boolean(admin), Boolean(parent))
+  if (audience === 'ambiguous') return NextResponse.json({ error: 'Ambiguous authentication.' }, { status: 403 })
+  if (audience !== 'parent' || !parent) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
   const { ticketNumber } = await context.params
   const publicTicketNumber = parseTicketNumber(ticketNumber)

@@ -553,7 +553,7 @@ export default function HomePage() {
             </span>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-2 md:gap-4">
+          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-4">
             <a
               href="tel:9603109222"
               className="flex items-center gap-2 rounded-2xl bg-white p-3 shadow-sm transition hover:-translate-y-0.5 md:p-4"
@@ -571,6 +571,24 @@ export default function HomePage() {
                 </span>
                 <span className="mt-0.5 block truncate text-[11px] font-bold text-helios-secondary md:text-sm">
                   9603109222
+                </span>
+              </span>
+            </a>
+
+            <a
+              href="mailto:heliosupportconnect@gmail.com"
+              className="flex min-w-0 items-center gap-2 rounded-2xl bg-white p-3 shadow-sm transition hover:-translate-y-0.5 md:p-4"
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-orange-100 text-orange-700 md:h-11 md:w-11">
+                <MaterialIcon className="text-base">mail</MaterialIcon>
+              </span>
+
+              <span className="min-w-0">
+                <span className="block text-[10px] font-semibold text-slate-500 md:text-sm">
+                  Email Support
+                </span>
+                <span className="block break-all text-sm font-extrabold text-slate-900 md:text-base">
+                  heliosupportconnect@gmail.com
                 </span>
               </span>
             </a>

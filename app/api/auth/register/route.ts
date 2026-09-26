@@ -4,6 +4,7 @@ import { createSession, toSafeParent } from '@/lib/auth'
 import { hashPassword } from '@/lib/password'
 import { prisma } from '@/lib/prisma'
 import { createParentRegistration, ExistingParentAccountError, StudentAdmissionConflictError } from '@/lib/registration-student'
+import { normalizeStudentClass, normalizeStudentSection } from '@/lib/ticket-policy'
 
 type RegistrationInput = {
   name: string
@@ -38,6 +39,9 @@ function parseRegistrationInput(value: unknown): RegistrationInput | null {
 
   const modeOfTransport = readString(value.student.modeOfTransport)
   if (modeOfTransport && modeOfTransport !== 'Self Transport' && modeOfTransport !== 'School Bus') return null
+  const className = normalizeStudentClass(readString(value.student.className))
+  const section = normalizeStudentSection(readString(value.student.section))
+  if (!className || !section) return null
 
   const input: RegistrationInput = {
     name: readString(value.name),
@@ -49,8 +53,8 @@ function parseRegistrationInput(value: unknown): RegistrationInput | null {
     student: {
       admissionNumber: readString(value.student.admissionNumber),
       name: readString(value.student.name),
-      className: readString(value.student.className),
-      section: readString(value.student.section),
+      className,
+      section,
       rollNumber: readString(value.student.rollNumber),
       house: readString(value.student.house),
       modeOfTransport: modeOfTransport as RegistrationInput['student']['modeOfTransport'],

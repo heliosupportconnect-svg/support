@@ -12,6 +12,8 @@ import {
   getLocalSession,
   getParentSession,
   logoutLocalParent,
+  STUDENT_CLASS_OPTIONS,
+  STUDENT_SECTION_OPTIONS,
 } from "@/lib/client-auth";
 import {
   createLocalTicket,
@@ -120,6 +122,8 @@ export default function ParentDashboardPage() {
   const router = useRouter();
   const [parent, setParent] = useState<ReturnType<typeof getLocalParent>>(null);
   const [tickets, setTickets] = useState<LocalTicket[]>([]);
+  const [studentClass, setStudentClass] = useState("");
+  const [studentSection, setStudentSection] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -135,6 +139,8 @@ export default function ParentDashboardPage() {
         return;
       }
       setParent(current.parent);
+      setStudentClass(current.parent.student.className);
+      setStudentSection(current.parent.student.section);
       void getLocalTicketsForParent().then(setTickets).catch(() => setTickets([]));
     });
 
@@ -239,6 +245,8 @@ export default function ParentDashboardPage() {
     try {
       const ticket = await createLocalTicket({
         studentId: currentParent.student.admissionNumber,
+        className: studentClass,
+        section: studentSection,
         category,
         subject: subject.trim(),
         description: description.trim(),
@@ -247,6 +255,8 @@ export default function ParentDashboardPage() {
       });
 
       setTickets((currentTickets) => [ticket, ...currentTickets]);
+      const refreshed = await getParentSession(true);
+      if (refreshed) setParent(refreshed.parent);
       setLastTicketNumber(ticket.ticketNumber);
       setSubject("");
       setDescription("");
@@ -563,7 +573,17 @@ export default function ParentDashboardPage() {
                     <span className="ml-1 text-helios-orange">*</span>
                   </label>
 
-                  <div className="helios-input" aria-readonly="true">{parent?.student.className || "Not available"}</div>
+                  <select
+                    id="student-current-class"
+                    value={studentClass}
+                    onChange={(event) => setStudentClass(event.target.value)}
+                    className="helios-input"
+                    required
+                    disabled={!parent}
+                  >
+                    <option value="" disabled>Select class</option>
+                    {STUDENT_CLASS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
                 </div>
 
                 <div>
@@ -572,7 +592,17 @@ export default function ParentDashboardPage() {
                     <span className="ml-1 text-helios-orange">*</span>
                   </label>
 
-                  <div className="helios-input" aria-readonly="true">{parent?.student.section || "Not available"}</div>
+                  <select
+                    id="student-current-section"
+                    value={studentSection}
+                    onChange={(event) => setStudentSection(event.target.value)}
+                    className="helios-input"
+                    required
+                    disabled={!parent}
+                  >
+                    <option value="" disabled>Select section</option>
+                    {STUDENT_SECTION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
                 </div>
               </div>
 

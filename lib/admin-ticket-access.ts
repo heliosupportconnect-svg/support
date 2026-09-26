@@ -1,13 +1,13 @@
-import { Prisma, type Prisma as PrismaTypes } from '@prisma/client'
+import type { Prisma as PrismaTypes } from '@prisma/client'
 
 type AdminIdentity = { adminId: string; role: string }
-type AdminTicket = { studentSnapshot: unknown; student: { className: string } | null; escalatedTo?: unknown; takenUpByAdminIds?: unknown; resolvedBy?: string | null }
+type AdminTicket = { studentSnapshot: unknown; escalatedTo?: unknown; takenUpByAdminIds?: unknown; resolvedBy?: string | null }
 
-function getClassNumber(ticket: Pick<AdminTicket, 'studentSnapshot' | 'student'>): number | null {
+function getClassNumber(ticket: Pick<AdminTicket, 'studentSnapshot'>): number | null {
   const snapshot = typeof ticket.studentSnapshot === 'object' && ticket.studentSnapshot !== null
     ? ticket.studentSnapshot as Record<string, unknown>
     : null
-  const className = typeof snapshot?.className === 'string' ? snapshot.className : ticket.student?.className ?? ''
+  const className = typeof snapshot?.className === 'string' ? snapshot.className : ''
   const match = className.match(/(\d+)/)
   return match ? Number(match[1]) : null
 }
@@ -19,15 +19,7 @@ function getClassNames(minimum: number, maximum: number): string[] {
 function getClassVisibilityWhere(minimum: number, maximum: number): PrismaTypes.TicketWhereInput {
   const classNames = getClassNames(minimum, maximum)
   return {
-    OR: [
-      ...classNames.map((className) => ({ studentSnapshot: { path: ['className'], equals: className } })),
-      {
-        AND: [
-          { studentSnapshot: { equals: Prisma.DbNull } },
-          { student: { className: { in: classNames } } },
-        ],
-      },
-    ],
+    OR: classNames.map((className) => ({ studentSnapshot: { path: ['className'], equals: className } })),
   }
 }
 
@@ -82,4 +74,19 @@ export function canMutateAdminTicket(admin: AdminIdentity, ticket: AdminTicket):
   if (takenUpByAdminIds.includes(admin.adminId)) return true
   if (ticket.resolvedBy === admin.adminId) return true
   return false
+}
+
+export function getAdminTakenTicketWhere(admin: AdminIdentity): PrismaTypes.TicketWhereInput {
+  return {
+    AND: [
+      getAdminTicketVisibilityWhere(admin),
+      { status: 'IN_REVIEW' },
+      {
+        OR: [
+          { takenUpBy: admin.adminId },
+          { takenUpByAdminIds: { array_contains: [admin.adminId] } },
+        ],
+      },
+    ],
+  }
 }

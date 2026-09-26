@@ -38,6 +38,14 @@ function normalizeStatusValue(value: string): 'OPEN' | 'IN_REVIEW' | 'RESOLVED' 
   }
 }
 
+export function getAvailableTicketStatuses(currentStatus: string): ('SUBMITTED' | 'IN_PROGRESS' | 'RESOLVED')[] {
+  const status = normalizeStatusValue(currentStatus)
+  if (status === 'OPEN') return ['SUBMITTED', 'IN_PROGRESS']
+  if (status === 'IN_REVIEW') return ['IN_PROGRESS', 'RESOLVED']
+  if (status === 'RESOLVED') return ['RESOLVED']
+  return []
+}
+
 export function validateStatusTransition(currentStatus: string, nextStatus: string): 400 | null {
   const previous = normalizeStatusValue(currentStatus)
   const next = normalizeStatusValue(nextStatus)
@@ -46,6 +54,36 @@ export function validateStatusTransition(currentStatus: string, nextStatus: stri
   if (previous === 'OPEN' && next === 'IN_REVIEW') return null
   if (previous === 'IN_REVIEW' && next === 'RESOLVED') return null
   return 400
+}
+
+export function validateAssignmentMutation(body: Record<string, unknown>): 400 | 403 | null {
+  const assignmentFields = ['assignedAdminId', 'assignedAdminRole', 'assignedTo']
+  const hasAssignmentMutation = assignmentFields.some((field) => Object.prototype.hasOwnProperty.call(body, field))
+  if (!hasAssignmentMutation) return null
+  return 403
+}
+
+export function deriveTakeUpOwnership(
+  existing: { takenUpBy: string | null; takenUpAt: Date | null; takenUpByAdminIds: unknown; takenUpAtByAdmin: unknown },
+  adminId: string,
+  now: Date,
+) {
+  const existingIds = Array.isArray(existing.takenUpByAdminIds)
+    ? existing.takenUpByAdminIds.filter((value): value is string => typeof value === 'string')
+    : []
+  const timestamps = typeof existing.takenUpAtByAdmin === 'object' && existing.takenUpAtByAdmin !== null && !Array.isArray(existing.takenUpAtByAdmin)
+    ? existing.takenUpAtByAdmin as Record<string, string>
+    : {}
+  return {
+    takenUpBy: existing.takenUpBy ?? adminId,
+    takenUpAt: existing.takenUpAt ?? now,
+    takenUpByAdminIds: Array.from(new Set([...existingIds, adminId])),
+    takenUpAtByAdmin: { ...timestamps, [adminId]: timestamps[adminId] ?? now.toISOString() },
+  }
+}
+
+export function deriveResolutionOwnership(adminId: string, now: Date) {
+  return { resolvedBy: adminId, resolvedAt: now }
 }
 
 export function canReorderDashboardSlides(role: string): boolean {

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 export const DASHBOARD_IMAGES_BUCKET = 'dashboard-images'
@@ -57,6 +57,10 @@ export async function uploadObject(
 
 export async function deleteObject(bucket: string, key: string): Promise<void> {
   await getClient().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+}
+
+export async function verifyObjectExists(bucket: string, key: string): Promise<void> {
+  await getClient().send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
 }
 
 export async function createSignedObjectUrl(

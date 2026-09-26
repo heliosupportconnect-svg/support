@@ -18,9 +18,11 @@ export type LocalTicket = {
   assignedTo?: string; assignedBy?: string; assignedAdminId?: string; assignedAdminRole?: string; escalatedTo?: string[]; escalatedAt?: string;
   takenUpBy?: string; takenUpAt?: string; takenUpByAdminIds?: string[]; takenUpAtByAdmin?: Record<string, string>;
   resolvedBy?: string; resolvedAt?: string; attachmentNames: string[]; createdAt: string; updatedAt: string; activities: LocalTicketActivity[];
-  attachments?: { id: string; fileName: string; mimeType: string; sizeBytes?: number | null; url?: string | null }[];
+  attachments?: { id?: string; fileName: string; mimeType: string; sizeBytes?: number | null; url?: string | null }[];
 };
 export type CreateLocalTicketInput = Pick<LocalTicket, "studentId" | "category" | "subject" | "description" | "attachmentNames"> & {
+  className: string;
+  section: string;
   attachment?: File;
 };
 
@@ -41,6 +43,14 @@ export async function loadTickets(): Promise<LocalTicket[]> {
   const response = await fetch("/api/tickets", { cache: "no-store" });
   const result = await responseJson(response);
   if (!response.ok || !Array.isArray(result.tickets)) throwResponse(result, "Unable to load tickets from Neon.");
+  return result.tickets as LocalTicket[];
+}
+
+export async function loadTakenUpTickets(): Promise<LocalTicket[]> {
+  if (!isBrowser()) return [];
+  const response = await fetch('/api/admin/tickets/taken', { cache: 'no-store' });
+  const result = await responseJson(response);
+  if (!response.ok || !Array.isArray(result.tickets)) throwResponse(result, 'Unable to load tickets assigned to this admin.');
   return result.tickets as LocalTicket[];
 }
 

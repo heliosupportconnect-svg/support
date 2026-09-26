@@ -5,14 +5,14 @@ import { canAccessAdminTicket, canMutateAdminTicket } from '@/lib/admin-ticket-a
 import { prisma } from '@/lib/prisma'
 import { mapTicket } from '@/app/api/tickets/route'
 import { parseLegacyTicketNumber, parseTicketNumber } from '@/lib/ticket-number'
-import { isParentTicketOwner } from '@/lib/ticket-access'
-import { validateEscalationMutation, validateStatusTransition } from '@/lib/ticket-policy'
+import { isParentTicketOwner, resolveTicketAudience } from '@/lib/ticket-access'
+import { deriveResolutionOwnership, deriveTakeUpOwnership, validateAssignmentMutation, validateEscalationMutation, validateStatusTransition } from '@/lib/ticket-policy'
 
 const includeTicket = {
   student: true,
   activities: { include: { actor: true }, orderBy: { createdAt: 'asc' as const } },
   notes: { include: { author: true }, orderBy: { createdAt: 'asc' as const } },
-  attachments: { orderBy: { uploadedAt: 'asc' as const } },
+  attachments: { orderBy: [{ uploadedAt: 'asc' as const }, { id: 'asc' as const }] },
 }
 
 function databaseStatus(status: unknown): string | undefined {
@@ -43,8 +43,10 @@ export async function GET(_request: Request, context: { params: Promise<{ ticket
   const legacyTicketNumber = publicTicketNumber === null ? parseLegacyTicketNumber(ticketNumber) : null
   if (publicTicketNumber === null && legacyTicketNumber === null) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
   const admin = await getCurrentAdmin()
-  const parent = admin ? null : await getCurrentParent()
-  if (!admin && !parent) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+  const parent = await getCurrentParent()
+  const audience = resolveTicketAudience(Boolean(admin), Boolean(parent))
+  if (audience === 'ambiguous') return NextResponse.json({ error: 'Ambiguous authentication.' }, { status: 403 })
+  if (!audience) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
   try {
     const ticket = await prisma.ticket.findUnique({
@@ -52,9 +54,9 @@ export async function GET(_request: Request, context: { params: Promise<{ ticket
       include: includeTicket,
     })
     if (!ticket) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
-    if (parent && !isParentTicketOwner(parent.id, ticket.reporterId)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
-    if (admin && !canAccessAdminTicket(admin.account, ticket)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
-    return NextResponse.json({ ticket: mapTicket(ticket, admin ? 'admin' : 'parent') })
+    if (audience === 'parent' && parent && !isParentTicketOwner(parent.id, ticket.reporterId)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    if (audience === 'admin' && admin && !canAccessAdminTicket(admin.account, ticket)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    return NextResponse.json({ ticket: mapTicket(ticket, audience) })
   } catch {
     return NextResponse.json({ error: 'Unable to load ticket from Neon.' }, { status: 503 })
   }
@@ -84,6 +86,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ ticke
 
     const escalationError = validateEscalationMutation(admin.account.role, existing.status, existing.escalatedTo, body)
     if (escalationError) return NextResponse.json({ error: 'Escalation is not allowed for this ticket or role.' }, { status: escalationError })
+    const assignmentError = validateAssignmentMutation(body)
+    if (assignmentError) return NextResponse.json({ error: 'Assignment metadata is server-managed.' }, { status: assignmentError })
 
     const requestedStatus = typeof body.status === 'string' ? body.status : undefined
     const status = requestedStatus ? databaseStatus(requestedStatus) : undefined
@@ -95,29 +99,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ ticke
       update.status = status
     }
     if (priority) update.priority = priority
-    if (typeof body.assignedTo === 'string') update.schoolName = body.assignedTo
-    if (typeof body.assignedAdminId === 'string') update.assignedAdminId = body.assignedAdminId
-    if (typeof body.assignedAdminRole === 'string') update.assignedAdminRole = body.assignedAdminRole
     const hasTakeUpMutation = ['takenUpBy', 'takenUpAt', 'takenUpByAdminIds', 'takenUpAtByAdmin'].some((key) => Object.prototype.hasOwnProperty.call(body, key))
     if (hasTakeUpMutation && requestedStatus !== 'IN_PROGRESS') return NextResponse.json({ error: 'Taking up a ticket requires In Progress status.' }, { status: 400 })
     if (hasTakeUpMutation) {
       const now = new Date()
-      const existingIds = Array.isArray(existing.takenUpByAdminIds) ? existing.takenUpByAdminIds.filter((value): value is string => typeof value === 'string') : []
-      const timestamps = typeof existing.takenUpAtByAdmin === 'object' && existing.takenUpAtByAdmin !== null && !Array.isArray(existing.takenUpAtByAdmin)
-        ? existing.takenUpAtByAdmin as Record<string, string>
-        : {}
-      update.takenUpBy = existing.takenUpBy ?? admin.account.adminId
-      update.takenUpAt = existing.takenUpAt ?? now
-      update.takenUpByAdminIds = Array.from(new Set([...existingIds, admin.account.adminId]))
-      update.takenUpAtByAdmin = { ...timestamps, [admin.account.adminId]: timestamps[admin.account.adminId] ?? now.toISOString() }
+      Object.assign(update, deriveTakeUpOwnership(existing, admin.account.adminId, now))
     }
     if (Object.prototype.hasOwnProperty.call(body, 'escalatedTo')) {
       update.escalatedTo = body.escalatedTo
       update.escalatedAt = new Date()
     }
     if (status === 'RESOLVED') {
-      update.resolvedBy = admin.account.adminId
-      update.resolvedAt = new Date()
+      Object.assign(update, deriveResolutionOwnership(admin.account.adminId, new Date()))
     }
 
     const activity = typeof body.activity === 'object' && body.activity !== null ? body.activity as Record<string, unknown> : null

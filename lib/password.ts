@@ -12,3 +12,11 @@ export function verifyPassword(
 ): Promise<boolean> {
   return bcrypt.compare(password, hash)
 }
+
+export async function verifyAdminPassword(password: string, passwordHash: string): Promise<boolean> {
+  if (!passwordHash.startsWith('$2')) {
+    return false
+  }
+
+  return verifyPassword(password, passwordHash)
+}

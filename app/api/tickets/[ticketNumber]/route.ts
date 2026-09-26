@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getCurrentAdmin } from '@/lib/admin-auth'
 import { getCurrentParent } from '@/lib/auth'
-import { canAccessAdminTicket } from '@/lib/admin-ticket-access'
+import { canAccessAdminTicket, canMutateAdminTicket } from '@/lib/admin-ticket-access'
 import { prisma } from '@/lib/prisma'
 import { mapTicket } from '@/app/api/tickets/route'
 import { parseLegacyTicketNumber, parseTicketNumber } from '@/lib/ticket-number'
 import { isParentTicketOwner } from '@/lib/ticket-access'
-import { validateEscalationMutation } from '@/lib/ticket-policy'
+import { validateEscalationMutation, validateStatusTransition } from '@/lib/ticket-policy'
 
 const includeTicket = {
   student: true,
@@ -77,7 +77,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ ticke
       include: { student: true },
     })
     if (!existing) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
-    if (!canAccessAdminTicket(admin.account, existing)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    if (!canMutateAdminTicket(admin.account, existing)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     if ((admin.account.role === 'VP_PRIMARY' || admin.account.role === 'VP_SECONDARY') && Array.isArray(existing.escalatedTo) && existing.escalatedTo.some((target) => target === 'PRINCIPAL' || target === 'DIRECTOR')) {
       return NextResponse.json({ error: 'This ticket is read-only after escalation.' }, { status: 403 })
     }
@@ -85,16 +85,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ ticke
     const escalationError = validateEscalationMutation(admin.account.role, existing.status, existing.escalatedTo, body)
     if (escalationError) return NextResponse.json({ error: 'Escalation is not allowed for this ticket or role.' }, { status: escalationError })
 
-    const status = databaseStatus(body.status)
+    const requestedStatus = typeof body.status === 'string' ? body.status : undefined
+    const status = requestedStatus ? databaseStatus(requestedStatus) : undefined
     const priority = databasePriority(body.priority)
     const update: Record<string, unknown> = {}
-    if (status) update.status = status
+    if (status) {
+      const transitionError = validateStatusTransition(existing.status, status)
+      if (transitionError) return NextResponse.json({ error: 'Ticket status change is not allowed.' }, { status: transitionError })
+      update.status = status
+    }
     if (priority) update.priority = priority
     if (typeof body.assignedTo === 'string') update.schoolName = body.assignedTo
     if (typeof body.assignedAdminId === 'string') update.assignedAdminId = body.assignedAdminId
     if (typeof body.assignedAdminRole === 'string') update.assignedAdminRole = body.assignedAdminRole
     const hasTakeUpMutation = ['takenUpBy', 'takenUpAt', 'takenUpByAdminIds', 'takenUpAtByAdmin'].some((key) => Object.prototype.hasOwnProperty.call(body, key))
-    if (hasTakeUpMutation && status !== 'IN_PROGRESS') return NextResponse.json({ error: 'Taking up a ticket requires In Progress status.' }, { status: 400 })
+    if (hasTakeUpMutation && requestedStatus !== 'IN_PROGRESS') return NextResponse.json({ error: 'Taking up a ticket requires In Progress status.' }, { status: 400 })
     if (hasTakeUpMutation) {
       const now = new Date()
       const existingIds = Array.isArray(existing.takenUpByAdminIds) ? existing.takenUpByAdminIds.filter((value): value is string => typeof value === 'string') : []

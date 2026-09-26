@@ -36,13 +36,28 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       await uploadObject(DASHBOARD_IMAGES_BUCKET, storageKey, preparedImage.body, preparedImage.contentType)
       imageUrl = null
     }
+
+    const nextOrder = typeof payload.order === 'number' ? payload.order : null
+    if (nextOrder !== null) {
+      const allSlides = await prisma.carouselSlide.findMany({ orderBy: { order: 'asc' } })
+      const currentIndex = allSlides.findIndex((candidate) => candidate.id === id)
+      if (currentIndex === -1) return NextResponse.json({ error: 'Slide not found.' }, { status: 404 })
+      const reordered = [...allSlides]
+      const [moved] = reordered.splice(currentIndex, 1)
+      const targetIndex = Math.max(0, Math.min(nextOrder, reordered.length))
+      reordered.splice(targetIndex, 0, moved)
+      await prisma.$transaction(reordered.map((candidate, index) => prisma.carouselSlide.update({
+        where: { id: candidate.id },
+        data: { order: index },
+      })))
+    }
+
     slide = await prisma.carouselSlide.update({
       where: { id },
       data: {
         title: typeof payload.title === 'string' ? payload.title.trim() : existing.title,
         subtitle: typeof payload.shortTitle === 'string' ? payload.shortTitle.trim() : existing.subtitle,
         isActive: typeof payload.active === 'boolean' ? payload.active : existing.isActive,
-        order: typeof payload.order === 'number' ? payload.order : existing.order,
         storageKey,
         imageUrl,
       },

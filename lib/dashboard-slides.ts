@@ -8,6 +8,7 @@ export type DashboardSlide = {
   updated: string;
   duration: number;
   active: boolean;
+  order?: number;
   storageKey?: string;
 };
 

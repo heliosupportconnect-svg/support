@@ -110,6 +110,26 @@ export default function AdminCarouselPage() {
     }
   }
 
+  async function moveSlide(id: string, direction: "up" | "down") {
+    const currentIndex = slides.findIndex((slide) => slide.id === id);
+    const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= slides.length) return;
+
+    const nextSlides = [...slides];
+    const [moved] = nextSlides.splice(currentIndex, 1);
+    nextSlides.splice(nextIndex, 0, moved);
+    setSlides(nextSlides);
+
+    try {
+      const reordered = nextSlides.map((slide, index) => ({ ...slide, order: index }));
+      await Promise.all(reordered.map((slide) => updateDashboardSlide(slide.id, { order: slide.order })));
+      setMessage(direction === "up" ? "Slide moved up." : "Slide moved down.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to reorder dashboard slide.");
+      setSlides(slides);
+    }
+  }
+
   function replaceSlide(id: string) {
     const input = document.createElement("input");
     input.type = "file";
@@ -351,6 +371,14 @@ export default function AdminCarouselPage() {
                   </div>
 
                   <div className="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                    <button type="button" onClick={() => moveSlide(slide.id, "up")} disabled={index === 0} className="flex items-center gap-1 rounded-lg bg-[#EAEDFF] px-3 py-1.5 text-[10px] font-semibold text-[#0D2137] disabled:cursor-not-allowed disabled:opacity-40">
+                      <span className="material-symbols-outlined text-[16px]">arrow_upward</span>
+                      Up
+                    </button>
+                    <button type="button" onClick={() => moveSlide(slide.id, "down")} disabled={index === slides.length - 1} className="flex items-center gap-1 rounded-lg bg-[#EAEDFF] px-3 py-1.5 text-[10px] font-semibold text-[#0D2137] disabled:cursor-not-allowed disabled:opacity-40">
+                      <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
+                      Down
+                    </button>
                     <button type="button" onClick={() => replaceSlide(slide.id)} className="flex items-center gap-1 rounded-lg bg-[#EAEDFF] px-3 py-1.5 text-[10px] font-semibold text-[#0D2137]">
                       <span className="material-symbols-outlined text-[16px]">swap_vert</span>
                       Replace

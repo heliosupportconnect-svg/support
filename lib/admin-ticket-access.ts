@@ -62,3 +62,24 @@ export function canAccessAdminTicket(admin: AdminIdentity, ticket: AdminTicket):
   if (ticket.resolvedBy === admin.adminId) return true
   return false
 }
+
+export function canMutateAdminTicket(admin: AdminIdentity, ticket: AdminTicket): boolean {
+  const classNumber = getClassNumber(ticket)
+  const escalatedTo = Array.isArray(ticket.escalatedTo) ? ticket.escalatedTo : []
+  const takenUpByAdminIds = Array.isArray(ticket.takenUpByAdminIds) ? ticket.takenUpByAdminIds : []
+
+  if (admin.role === 'VP_PRIMARY') {
+    const isOwnQueueTicket = classNumber !== null && classNumber >= 1 && classNumber <= 5
+    return isOwnQueueTicket && !escalatedTo.some((target) => target === 'PRINCIPAL' || target === 'DIRECTOR')
+  }
+  if (admin.role === 'VP_SECONDARY') {
+    const isOwnQueueTicket = classNumber !== null && classNumber >= 6 && classNumber <= 10
+    return isOwnQueueTicket && !escalatedTo.some((target) => target === 'PRINCIPAL' || target === 'DIRECTOR')
+  }
+  if (admin.role !== 'PRINCIPAL' && admin.role !== 'DIRECTOR') return false
+
+  if (escalatedTo.includes(admin.role)) return true
+  if (takenUpByAdminIds.includes(admin.adminId)) return true
+  if (ticket.resolvedBy === admin.adminId) return true
+  return false
+}

@@ -20,6 +20,38 @@ export function getQueueForStudentClass(className: string): 'VP_PRIMARY' | 'VP_S
   return classNumber >= 1 && classNumber <= 5 ? 'VP_PRIMARY' : classNumber <= 10 ? 'VP_SECONDARY' : null
 }
 
+function normalizeStatusValue(value: string): 'OPEN' | 'IN_REVIEW' | 'RESOLVED' | null {
+  switch (value) {
+    case 'SUBMITTED':
+    case 'OPEN':
+      return 'OPEN'
+    case 'IN_PROGRESS':
+    case 'ASSIGNED':
+    case 'ESCALATED':
+    case 'IN_REVIEW':
+      return 'IN_REVIEW'
+    case 'RESOLVED':
+    case 'CLOSED':
+      return 'RESOLVED'
+    default:
+      return null
+  }
+}
+
+export function validateStatusTransition(currentStatus: string, nextStatus: string): 400 | null {
+  const previous = normalizeStatusValue(currentStatus)
+  const next = normalizeStatusValue(nextStatus)
+  if (!previous || !next) return 400
+  if (previous === next) return null
+  if (previous === 'OPEN' && next === 'IN_REVIEW') return null
+  if (previous === 'IN_REVIEW' && next === 'RESOLVED') return null
+  return 400
+}
+
+export function canReorderDashboardSlides(role: string): boolean {
+  return role === 'PRINCIPAL' || role === 'DIRECTOR'
+}
+
 export function validateEscalationMutation(
   role: string,
   currentStatus: string,

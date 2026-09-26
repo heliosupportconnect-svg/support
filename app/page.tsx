@@ -349,7 +349,7 @@ export default function HomePage() {
           ) : (
             <div className="absolute inset-x-0 bottom-0 z-20 pb-6 md:pb-8 lg:pb-10">
               <div className="mx-auto w-full max-w-[1440px] px-4 md:px-8 lg:px-12">
-                <div className="max-w-[560px] rounded-2xl border border-white/20 bg-slate-900/20 p-4 backdrop-blur-sm">
+                <div className="max-w-[560px] rounded-2xl border border-white/20 bg-[#0D2137] p-4">
                   <span className="mb-2.5 inline-flex rounded-full bg-helios-orange px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-white shadow-sm md:px-3 md:py-1 md:text-[10px]">
                     School Update
                   </span>

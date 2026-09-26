@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { cookies } from 'next/headers'
-import { verifyPassword } from '@/lib/password'
+import { verifyAdminPassword } from '@/lib/password'
 import { AdminRole, type AdminAccount } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
@@ -25,13 +25,7 @@ export function normalizeAdminUsername(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '')
 }
 
-export async function verifyAdminPassword(password: string, passwordHash: string): Promise<boolean> {
-  if (passwordHash.startsWith('$2')) {
-    return verifyPassword(password, passwordHash)
-  }
-
-  return createHash('sha256').update(password).digest('hex') === passwordHash
-}
+export { verifyAdminPassword } from '@/lib/password'
 
 export function toSafeAdmin(account: AdminAccount): SafeAdminAccount {
   return {

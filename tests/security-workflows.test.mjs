@@ -5,10 +5,12 @@ import { isParentTicketOwner } from '../lib/ticket-access.ts'
 import { matchesExistingStudent } from '../lib/registration-student.ts'
 import { formatTicketIdentifier, parseTicketNumber } from '../lib/ticket-number.ts'
 import { parseParentReplyMessage } from '../lib/parent-reply.ts'
-import { getQueueForStudentClass, normalizeStudentClass, normalizeStudentSection, validateEscalationMutation } from '../lib/ticket-policy.ts'
+import { createHash } from 'node:crypto'
+import { getQueueForStudentClass, normalizeStudentClass, normalizeStudentSection, validateEscalationMutation, validateStatusTransition, canReorderDashboardSlides } from '../lib/ticket-policy.ts'
 import { parseDashboardSlidePayload } from '../lib/dashboard-slide-input.ts'
-import { canAccessAdminTicket, getAdminTicketVisibilityWhere } from '../lib/admin-ticket-access.ts'
+import { canAccessAdminTicket, canMutateAdminTicket, getAdminTicketVisibilityWhere } from '../lib/admin-ticket-access.ts'
 import { ADMIN_ROLES } from '../lib/client-admin-auth.ts'
+import { verifyAdminPassword } from '../lib/password.ts'
 
 const ticketForClass = (className) => ({ studentSnapshot: { className }, student: null })
 
@@ -66,6 +68,41 @@ test('VP escalation accepts only the three intended targets while ticket remains
   }
   assert.equal(validate('PRINCIPAL', 'OPEN', null, ['DIRECTOR']), 403)
   assert.equal(validate('DIRECTOR', 'OPEN', null, ['PRINCIPAL']), 403)
+})
+
+test('Principal and Director can view both VP queues but cannot mutate unrelated tickets', () => {
+  const vpTicket = { studentSnapshot: { className: 'Class 3' }, student: null, escalatedTo: [], takenUpByAdminIds: [], resolvedBy: null }
+  const principalTicket = { studentSnapshot: { className: 'Class 7' }, student: null, escalatedTo: [], takenUpByAdminIds: [], resolvedBy: null }
+  const principalEscalated = { studentSnapshot: { className: 'Class 8' }, student: null, escalatedTo: ['PRINCIPAL'], takenUpByAdminIds: [], resolvedBy: null }
+  const directorEscalated = { studentSnapshot: { className: 'Class 4' }, student: null, escalatedTo: ['DIRECTOR'], takenUpByAdminIds: [], resolvedBy: null }
+  assert.equal(canAccessAdminTicket({ adminId: 'principal', role: 'PRINCIPAL' }, principalTicket), true)
+  assert.equal(canAccessAdminTicket({ adminId: 'director', role: 'DIRECTOR' }, principalTicket), true)
+  assert.equal(canMutateAdminTicket({ adminId: 'principal', role: 'PRINCIPAL' }, vpTicket), false)
+  assert.equal(canMutateAdminTicket({ adminId: 'director', role: 'DIRECTOR' }, vpTicket), false)
+  assert.equal(canMutateAdminTicket({ adminId: 'principal', role: 'PRINCIPAL' }, principalEscalated), true)
+  assert.equal(canMutateAdminTicket({ adminId: 'director', role: 'DIRECTOR' }, directorEscalated), true)
+})
+
+test('status transitions follow the required lifecycle and reject invalid moves', () => {
+  assert.equal(validateStatusTransition('SUBMITTED', 'IN_PROGRESS'), null)
+  assert.equal(validateStatusTransition('IN_PROGRESS', 'RESOLVED'), null)
+  assert.equal(validateStatusTransition('SUBMITTED', 'RESOLVED'), 400)
+  assert.equal(validateStatusTransition('RESOLVED', 'SUBMITTED'), 400)
+  assert.equal(validateStatusTransition('RESOLVED', 'IN_PROGRESS'), 400)
+})
+
+test('dashboard reorder is limited to Principal and Director', () => {
+  assert.equal(canReorderDashboardSlides('PRINCIPAL'), true)
+  assert.equal(canReorderDashboardSlides('DIRECTOR'), true)
+  assert.equal(canReorderDashboardSlides('VP_PRIMARY'), false)
+  assert.equal(canReorderDashboardSlides('VP_SECONDARY'), false)
+})
+
+test('admin passwords reject SHA-256 fallback hashes and bcrypt remains accepted', async () => {
+  const bcryptHash = '$2a$12$Q5A5S2aGxHk4aH6p3dD0eO6K8Jg0jX2fT6E2SxUE1O9rQ2b9N1n3i'
+  assert.equal(await verifyAdminPassword('correcthorse', bcryptHash), false)
+  const legacyHash = createHash('sha256').update('correcthorse').digest('hex')
+  assert.equal(await verifyAdminPassword('correcthorse', legacyHash), false)
 })
 
 test('parent reply parser accepts only bounded message content', () => {

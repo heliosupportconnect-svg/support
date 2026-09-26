@@ -24,7 +24,15 @@ export async function GET(_request: Request, context: { params: Promise<{ ticket
     if (!attachment) return NextResponse.json({ error: 'Attachment not found.' }, { status: 404 })
     if (!isParentTicketOwner(parent.id, attachment.ticket.reporterId)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     if (!attachment.storageKey) return NextResponse.json({ error: 'Attachment storage reference is missing.' }, { status: 503 })
-    return NextResponse.redirect(await createSignedObjectUrl(TICKET_ATTACHMENTS_BUCKET, attachment.storageKey))
+
+    const download = new URL(_request.url).searchParams.get('download') === '1'
+    const signedUrl = await createSignedObjectUrl(
+      TICKET_ATTACHMENTS_BUCKET,
+      attachment.storageKey,
+      300,
+      download ? { downloadFileName: attachment.fileName, contentType: attachment.mimeType } : {},
+    )
+    return NextResponse.redirect(signedUrl)
   } catch {
     return NextResponse.json({ error: 'Unable to retrieve attachment.' }, { status: 503 })
   }

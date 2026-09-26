@@ -4,6 +4,7 @@ import { getCurrentAdmin } from '@/lib/admin-auth'
 import { getCurrentParent } from '@/lib/auth'
 import { getAdminTicketVisibilityWhere } from '@/lib/admin-ticket-access'
 import { prisma } from '@/lib/prisma'
+import { findParentOwnedStudentLink } from '@/lib/parent-student-access'
 import { createStorageKey, deleteObject, TICKET_ATTACHMENTS_BUCKET, uploadObject } from '@/lib/object-storage'
 import { formatTicketIdentifier } from '@/lib/ticket-number'
 import { selectTicketHistory } from '@/lib/ticket-history'
@@ -145,20 +146,7 @@ export async function POST(request: Request) {
 
   const requestedStudentId = typeof payload.studentId === 'string' ? payload.studentId.trim() : ''
   if (!requestedStudentId) return NextResponse.json({ error: 'A linked student must be selected.' }, { status: 400 })
-  const studentLink = await prisma.parentStudent.findFirst({
-    where: {
-      userId: parent.id,
-      ...(requestedStudentId
-        ? {
-            OR: [
-              { studentId: requestedStudentId },
-              { student: { admissionNumber: requestedStudentId } },
-            ],
-          }
-        : {}),
-    },
-    include: { student: true },
-  })
+  const studentLink = await findParentOwnedStudentLink(prisma.parentStudent, parent.id, requestedStudentId)
   if (!studentLink) {
     return NextResponse.json({ error: 'The selected student is not linked to this parent account.' }, { status: 403 })
   }

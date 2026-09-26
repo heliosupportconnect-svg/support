@@ -32,7 +32,7 @@ export type LocalSession = { userId: string; role: "PARENT"; createdAt: string }
 
 export class LocalAccountExistsError extends Error {
   constructor() {
-    super("An account with this mobile number already exists.");
+    super("An account with this mobile number or email already exists.");
     this.name = "LocalAccountExistsError";
   }
 }
@@ -106,7 +106,7 @@ function readParent(value: unknown): LocalParentAccount | null {
   };
 }
 
-async function readResponse(response: Response): Promise<{ parent?: unknown; error?: string }> {
+async function readResponse(response: Response): Promise<{ parent?: unknown; error?: string; code?: string }> {
   try { return await response.json(); } catch { return {}; }
 }
 
@@ -140,7 +140,7 @@ export async function registerLocalParent(data: LocalParentRegistrationData): Pr
     body: JSON.stringify(data),
   });
   const result = await readResponse(response);
-  if (response.status === 409) throw new LocalAccountExistsError();
+  if (response.status === 409 && result.code === 'ACCOUNT_EXISTS') throw new LocalAccountExistsError();
   if (!response.ok || !result.parent) throw new Error(result.error ?? "Unable to create the Neon account.");
   const parent = readParent(result.parent);
   if (!parent) throw new Error("The server returned an invalid parent account.");

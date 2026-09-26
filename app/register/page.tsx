@@ -278,7 +278,7 @@ export default function RegisterPage() {
         return;
       }
 
-      setError("Unable to create the local account. Please try again.");
+      setError(registrationError instanceof Error ? registrationError.message : "Unable to create the local account. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

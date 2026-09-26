@@ -499,7 +499,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 md:gap-3">
+              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
                 <a
                   href="tel:9603109222"
                   className="flex items-center justify-center gap-1.5 rounded-xl bg-white px-3 py-3 text-sm font-bold text-slate-800 shadow-sm transition hover:-translate-y-0.5"
@@ -519,7 +519,7 @@ export default function LoginPage() {
                     mail
                   </MaterialIcon>
 
-                  <span>heliosupportconnect@gmail.com</span>
+                  <span className="min-w-0 break-words">heliosupportconnect@gmail.com</span>
                 </a>
               </div>
 

@@ -249,47 +249,47 @@ export default function HomePage() {
           HEADER
           ===================================================== */}
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/95 shadow-sm backdrop-blur-xl">
-        <div className="mx-auto flex min-h-[72px] w-full max-w-[1440px] items-center justify-between gap-4 px-4 py-3 md:min-h-[82px] md:px-8 lg:px-12">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="mx-auto flex min-h-[72px] w-full max-w-[1440px] items-center justify-between gap-2 px-3 py-2 md:min-h-[82px] md:gap-4 md:px-8 md:py-3 lg:px-12">
+          <div className="flex min-w-0 items-center gap-2 md:gap-3">
             <img
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2Gj2lvWtHD1sv1G4tT4L9mv-VEjz1hJvCQuy5Kjw4k3WzYjsuZCLeFcEdC029-3dpXfOh5VlB1a7oHnTHh6xccxEnZNq2IeiAmX1IAogHlyJFdHUp8kN_P6l42vGG4iZmorXnKP7Jdvfn-j80_Jjq6yORVetTR0tjkR1k7oEtl9f7eQwG2CM8Cq7olXjdRAPxDXqOG5wScDA3-mzq7DCoNkKj2tlydS_VE-iWTqvBHScQf-D46XkJEVgQaPszWV4s0g"
               alt="Helios Sunburst Logo"
-              className="h-11 w-11 shrink-0 object-contain md:h-14 md:w-14"
+              className="h-9 w-9 shrink-0 object-contain md:h-14 md:w-14"
             />
 
             <div className="min-w-0 leading-tight">
-              <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-helios-secondary md:text-xs">
+              <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-helios-secondary md:text-xs md:tracking-[0.16em]">
                 Helios
               </div>
 
-              <div className="truncate text-sm font-extrabold text-slate-900 md:text-xl">
+              <div className="whitespace-nowrap text-[11px] font-extrabold text-slate-900 md:text-xl">
                 Sadineni Chowdaraiah
               </div>
 
-              <div className="truncate text-xs font-semibold text-slate-500 md:text-sm">
+              <div className="whitespace-nowrap text-[10px] font-semibold text-slate-500 md:text-sm">
                 Futuristic School
               </div>
 
-              <div className="mt-0.5 truncate text-[9px] font-extrabold uppercase tracking-[0.1em] text-helios-secondary md:text-[11px]">
+              <div className="mt-0.5 hidden text-[9px] font-extrabold uppercase tracking-[0.1em] text-helios-secondary sm:block md:text-[11px]">
                 Parent Support & Ticketing Portal
               </div>
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 md:gap-3">
+          <div className="flex w-[76px] shrink-0 flex-col items-stretch gap-1.5 md:w-auto md:flex-row md:items-center md:gap-3">
             <Link
               href="/login"
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-helios-surface-container px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-helios-surface-high md:px-5 md:py-2.5 md:text-base"
+              className="inline-flex min-h-9 whitespace-nowrap items-center justify-center gap-1 rounded-full bg-helios-surface-container px-1.5 py-1.5 text-xs font-bold text-slate-800 transition hover:bg-helios-surface-high md:min-h-10 md:gap-1.5 md:px-5 md:py-2.5 md:text-base"
             >
-              <MaterialIcon className="text-[18px]">lock</MaterialIcon>
+              <MaterialIcon className="text-[16px] md:text-[18px]">lock</MaterialIcon>
               <span>Login</span>
             </Link>
 
             <Link
               href="/register"
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-helios-orange px-4 py-2 text-sm font-extrabold text-white shadow-sm transition hover:brightness-95 active:scale-[0.98] md:px-6 md:py-2.5 md:text-base"
+              className="inline-flex min-h-9 whitespace-nowrap items-center justify-center gap-1 rounded-full bg-helios-orange px-1.5 py-1.5 text-xs font-extrabold text-white shadow-sm transition hover:brightness-95 active:scale-[0.98] md:min-h-10 md:gap-1.5 md:px-6 md:py-2.5 md:text-base"
             >
-              <MaterialIcon className="text-[18px]">person_add</MaterialIcon>
+              <MaterialIcon className="text-[16px] md:text-[18px]">person_add</MaterialIcon>
               <span>Sign Up</span>
             </Link>
           </div>

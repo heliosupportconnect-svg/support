@@ -135,6 +135,14 @@ export async function revokeSession(token: string): Promise<void> {
   })
 }
 
+export async function revokeCurrentParentSession(): Promise<void> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
+
+  if (token) await revokeSession(token)
+  await clearSessionCookie()
+}
+
 export async function getCurrentUser(): Promise<SafeUser | null> {
   const cookieStore = await cookies()
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value

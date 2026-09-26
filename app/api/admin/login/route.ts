@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminSession, normalizeAdminUsername, toSafeAdmin, verifyAdminPassword } from '@/lib/admin-auth'
+import { revokeCurrentParentSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: Request) {
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 })
     }
 
+    await revokeCurrentParentSession()
     await createAdminSession(account.adminId, rememberMe)
     return NextResponse.json({ account: toSafeAdmin(account) })
   } catch {

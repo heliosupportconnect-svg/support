@@ -57,6 +57,68 @@ test('ticket audience rejects simultaneous valid parent and admin sessions', () 
   assert.equal(resolveTicketAudience(true, true), 'ambiguous')
 })
 
+test('parent and admin login replace only the opposite role session in the current request', async () => {
+  const [parentLogin, adminLogin, parentAuth, adminAuth] = await Promise.all([
+    readFile(new URL('../app/api/auth/login/route.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../app/api/admin/login/route.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../lib/auth.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../lib/admin-auth.ts', import.meta.url), 'utf8'),
+  ])
+  const parentRevokesAdmin = parentLogin.indexOf('await revokeCurrentAdminSession()')
+  const parentCreatesSession = parentLogin.indexOf('await createSession(user.id)')
+  const adminRevokesParent = adminLogin.indexOf('await revokeCurrentParentSession()')
+  const adminCreatesSession = adminLogin.indexOf('await createAdminSession(account.adminId, rememberMe)')
+  assert.ok(parentRevokesAdmin >= 0 && parentRevokesAdmin < parentCreatesSession)
+  assert.ok(adminRevokesParent >= 0 && adminRevokesParent < adminCreatesSession)
+  assert.match(parentAuth, /cookieStore\.get\(SESSION_COOKIE_NAME\)\?\.value/)
+  assert.match(parentAuth, /if \(token\) await revokeSession\(token\)/)
+  assert.match(parentAuth, /await clearSessionCookie\(\)/)
+  assert.match(parentAuth, /tokenHash: hashSessionToken\(token\),\s*revokedAt: null/)
+  assert.match(adminAuth, /cookieStore\.get\(ADMIN_SESSION_COOKIE\)\?\.value/)
+  assert.match(adminAuth, /tokenHash: hashSessionToken\(token\), revokedAt: null/)
+  assert.match(adminAuth, /await clearAdminSessionCookie\(\)/)
+  assert.match(parentAuth, /export const SESSION_COOKIE_NAME = 'helios_session'/)
+  assert.match(adminAuth, /export const ADMIN_SESSION_COOKIE = 'helios_admin_session'/)
+  assert.doesNotMatch(parentAuth, /session\.deleteMany|where: \{ userId:/)
+  assert.doesNotMatch(adminAuth, /adminSession\.deleteMany|where: \{ adminId:/)
+  assert.match(parentAuth, /httpOnly: true,\s*secure: process\.env\.NODE_ENV === 'production',\s*sameSite: 'lax' as const,\s*path: '\/'/)
+  assert.match(adminAuth, /httpOnly: true,\s*secure: process\.env\.NODE_ENV === 'production',\s*sameSite: 'lax' as const,\s*path: '\/'/)
+  assert.doesNotMatch(parentAuth, /domain:/i)
+  assert.doesNotMatch(adminAuth, /domain:/i)
+})
+
+test('role-specific logout revokes and clears only its own cookie', async () => {
+  const [parentLogout, adminLogout] = await Promise.all([
+    readFile(new URL('../app/api/auth/logout/route.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../app/api/admin/logout/route.ts', import.meta.url), 'utf8'),
+  ])
+  assert.match(parentLogout, /revokeCurrentParentSession\(\)/)
+  assert.match(adminLogout, /revokeCurrentAdminSession\(\)/)
+})
+
+test('separate device role sessions remain independent while same-request dual sessions fail closed', () => {
+  const deviceA = { admin: true, parent: false }
+  const deviceB = { admin: false, parent: true }
+  assert.equal(resolveTicketAudience(deviceA.admin, deviceA.parent), 'admin')
+  assert.equal(resolveTicketAudience(deviceB.admin, deviceB.parent), 'parent')
+  assert.equal(resolveTicketAudience(true, true), 'ambiguous')
+})
+
+test('parent submission works with parent-only auth after admin switch; admin PATCH remains admin-only', async () => {
+  const [ticketsRoute, detailRoute] = await Promise.all([
+    readFile(new URL('../app/api/tickets/route.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../app/api/tickets/[ticketNumber]/route.ts', import.meta.url), 'utf8'),
+  ])
+  const submission = ticketsRoute.slice(ticketsRoute.indexOf('export async function POST'))
+  assert.match(submission, /if \(audience === 'ambiguous'\).*?403/s)
+  assert.match(submission, /if \(audience !== 'parent' \|\| !parent\).*?401/s)
+  assert.ok(submission.indexOf("audience !== 'parent'") < submission.indexOf('request.formData()'))
+  const patch = detailRoute.slice(detailRoute.indexOf('export async function PATCH'))
+  assert.match(patch, /const admin = await getCurrentAdmin\(\)/)
+  assert.match(patch, /if \(!admin\) return NextResponse\.json\(\{ error: 'Admin authentication required\.'/)
+  assert.doesNotMatch(patch, /getCurrentParent\(\)/)
+})
+
 test('parent ticket handlers fail closed on simultaneous parent and admin sessions', async () => {
   const routePaths = [
     '../app/api/tickets/route.ts',

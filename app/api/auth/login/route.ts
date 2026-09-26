@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSession, toSafeParent } from '@/lib/auth'
+import { revokeCurrentAdminSession } from '@/lib/admin-auth'
 import { verifyPassword } from '@/lib/password'
 import { prisma } from '@/lib/prisma'
 
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 })
     }
 
+    await revokeCurrentAdminSession()
     await createSession(user.id)
     const parent = await prisma.user.findUnique({
       where: { id: user.id },
